@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "620812524626",
+    "project_id": "poupai-fc3f4",
+    "storage_bucket": "poupai-fc3f4.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:620812524626:android:9ce47973f6057ddab3938b",
+        "android_client_info": {
+          "package_name": "com.example.poupai"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBiFPHE7oIGOE2BtjEO21NRpPTZnLaNn5E"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
