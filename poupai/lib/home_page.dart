@@ -5,9 +5,11 @@ import 'metas.dart';
 import 'perfil_page.dart';
 import 'configuracoes_conta_page.dart';
 import 'configuracoes_app_page.dart';
+import 'services/api_services.dart'; // integração com FastAPI
 
 class HomePage extends StatefulWidget {
-  final int usuarioId;
+  /// Agora o ID vem do Supabase Auth (UUID)
+  final String usuarioId;
 
   const HomePage({Key? key, required this.usuarioId}) : super(key: key);
 
@@ -16,9 +18,10 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  int _paginaAtual = 1;
+  int _paginaAtual = 0;
 
   late List<Widget> _telas;
+  final ApiService apiService = ApiService();
 
   @override
   void initState() {
@@ -29,17 +32,27 @@ class _HomePageState extends State<HomePage> {
       MetasPage(usuarioId: widget.usuarioId),
     ];
   }
-  void _exportarDados() async {
-    // Aqui você pode implementar a lógica de exportação real
-    // Por exemplo, exportar como CSV ou JSON
 
+  /// === Função para exportar dados do usuário ===
+  Future<void> _exportarDados() async {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Exportação iniciada...'),
-      ),
+      const SnackBar(content: Text('🔄 Iniciando exportação...')),
     );
 
-    // TODO: sua lógica de exportação aqui
+    try {
+      final data = await apiService.getResumoCompleto(widget.usuarioId);
+
+      // exemplo simples de exportação local
+      print('📦 Dados exportados: $data');
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('✅ Exportação concluída!')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('❌ Erro ao exportar: $e')),
+      );
+    }
   }
 
   @override
@@ -66,38 +79,29 @@ class _HomePageState extends State<HomePage> {
               leading: const Icon(Icons.person),
               title: const Text('Perfil'),
               onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => PerfilPage()),
-                );
+                Navigator.push(context, MaterialPageRoute(builder: (_) => PerfilPage()));
               },
             ),
             ListTile(
               leading: const Icon(Icons.settings),
               title: const Text('Configurações de Conta'),
               onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => ConfiguracoesContaPage()),
-                );
+                Navigator.push(context, MaterialPageRoute(builder: (_) => ConfiguracoesContaPage()));
               },
             ),
             ListTile(
               leading: const Icon(Icons.tune),
               title: const Text('Configurações do App'),
               onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => ConfiguracoesAppPage()),
-                );
+                Navigator.push(context, MaterialPageRoute(builder: (_) => ConfiguracoesAppPage()));
               },
             ),
             ListTile(
-              leading: Icon(Icons.file_download),
-              title: Text('Exportar Dados'),
+              leading: const Icon(Icons.file_download),
+              title: const Text('Exportar Dados'),
               onTap: () {
-                Navigator.pop(context); // Fecha o drawer
-                _exportarDados();       // Chama a função de exportação
+                Navigator.pop(context);
+                _exportarDados();
               },
             ),
           ],
@@ -109,24 +113,11 @@ class _HomePageState extends State<HomePage> {
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _paginaAtual,
-        onTap: (index) {
-          setState(() {
-            _paginaAtual = index;
-          });
-        },
+        onTap: (index) => setState(() => _paginaAtual = index),
         items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.pie_chart),
-            label: 'Dashboard',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.chat_bubble_outline),
-            label: 'Poup.ai',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.flag),
-            label: 'Metas',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.pie_chart), label: 'Dashboard'),
+          BottomNavigationBarItem(icon: Icon(Icons.chat_bubble_outline), label: 'Poup.ai'),
+          BottomNavigationBarItem(icon: Icon(Icons.flag), label: 'Metas'),
         ],
       ),
     );

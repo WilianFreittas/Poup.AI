@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:poupai/database_helper.dart';
-import 'package:sqflite/sqflite.dart';         // <- adicione isso
-import 'package:sqflite_common_ffi/sqflite_ffi.dart'; // <- adicione isso
+import 'package:dio/dio.dart'; // <– nova dependência
 import 'home_page.dart';
 import 'telacadastro.dart';
 
@@ -15,14 +13,12 @@ class Login extends StatefulWidget {
 class _LoginState extends State<Login> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
-
   bool isLoading = false;
 
-  Future<void> loginUsuario() async {
-    setState(() {
-      isLoading = true;
-    });
+  // Endereço base da API
+  final String baseUrl = 'http://127.0.0.1:8000'; // ajuste conforme ambiente
 
+  Future<void> loginUsuario() async {
     final email = emailController.text.trim();
     final senha = passwordController.text.trim();
 
@@ -30,53 +26,65 @@ class _LoginState extends State<Login> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Preencha todos os campos.')),
       );
-      setState(() {
-        isLoading = false;
-      });
       return;
     }
 
+    setState(() => isLoading = true);
+
     try {
-      final db = await DatabaseHelper().database;
-      final List<Map<String, dynamic>> usuarios = await db.query(
-        'usuarios',
-        where: 'email = ? AND senha = ?',
-        whereArgs: [email, senha],
+      final dio = Dio();
+
+      final response = await dio.post(
+        '$baseUrl/login',
+        data: {
+          'email': email,
+          'senha': senha,
+        },
+        options: Options(headers: {'Content-Type': 'application/json'}),
       );
 
-      if (usuarios.isNotEmpty) {
+      if (response.statusCode == 200) {
+        final data = response.data;
+
+        // supondo que a API retorne algo como:
+        // { "usuario_id": "uuid", "token": "..." }
+
+        final usuarioId = data['usuario_id'];
+        final token = data['token'];
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Login realizado com sucesso!')),
         );
-        final usuarioId = usuarios.first['id'] as int?;
 
-        if (usuarioId != null) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => HomePage(usuarioId: usuarioId),
-            ),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Erro ao recuperar ID do usuário.')),
-          );
-        }
+        // Aqui você pode salvar o token localmente (para futuras requisições autenticadas)
+        // Exemplo com shared_preferences:
+        // final prefs = await SharedPreferences.getInstance();
+        // await prefs.setString('auth_token', token);
 
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => HomePage(usuarioId: usuarioId),
+          ),
+        );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('E-mail ou senha inválidos.')),
+          SnackBar(content: Text('Falha no login: ${response.statusMessage}')),
         );
       }
+    } on DioException catch (e) {
+      final msg = e.response?.data?['detail'] ??
+          'Não foi possível conectar à API. Verifique o servidor.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erro: $msg')),
+      );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro inesperado: ${e.toString()}')),
+        SnackBar(content: Text('Erro inesperado: $e')),
       );
+    } finally {
+      setState(() => isLoading = false);
     }
-
-    setState(() {
-      isLoading = false;
-    });
   }
 
   @override

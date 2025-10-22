@@ -44,6 +44,8 @@ dependencies:
   sqflite: ^2.3.0
   path: any
   sqflite_common_ffi: ^2.3.0+2
+  flutter_launcher_icons: ^0.14.4
+  dio: ^5.5.0
 
 
 

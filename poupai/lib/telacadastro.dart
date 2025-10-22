@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'login.dart'; // Para redirecionar de volta ao login
-import 'database_helper.dart'; // Importa o helper do banco de dados
+import 'login.dart';
+import '../services/api_services.dart';
 
 class TelaCadastro extends StatefulWidget {
   const TelaCadastro({super.key});
@@ -13,13 +13,15 @@ class _TelaCadastroState extends State<TelaCadastro> {
   final nameController = TextEditingController();
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
+  final ApiService _apiService = ApiService();
 
   bool isLoading = false;
 
+  // ======================================================
+  // 🧾 CADASTRAR USUÁRIO VIA API
+  // ======================================================
   Future<void> cadastrarUsuario() async {
-    setState(() {
-      isLoading = true;
-    });
+    setState(() => isLoading = true);
 
     final nome = nameController.text.trim();
     final email = emailController.text.trim();
@@ -29,40 +31,40 @@ class _TelaCadastroState extends State<TelaCadastro> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Preencha todos os campos.')),
       );
-      setState(() {
-        isLoading = false;
-      });
+      setState(() => isLoading = false);
       return;
     }
 
     try {
-      final usuario = {
-        'nome': nome,
-        'email': email,
-        'senha': senha,
-      };
+      // 🔗 Chamada ao backend via ApiService
+      final sucesso = await _apiService.cadastrarUsuario(nome, email, senha);
 
-      await DatabaseHelper().inserirUsuario(usuario); // ✅ Usando o método certo
+      if (sucesso) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Cadastro realizado com sucesso!')),
+        );
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Cadastro realizado com sucesso!')),
-      );
-
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const Login()),
-      );
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const Login()),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Erro ao cadastrar. Tente novamente.')),
+        );
+      }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Erro ao cadastrar: ${e.toString()}')),
       );
     }
 
-    setState(() {
-      isLoading = false;
-    });
+    setState(() => isLoading = false);
   }
 
+  // ======================================================
+  // 🧱 INTERFACE
+  // ======================================================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -73,7 +75,7 @@ class _TelaCadastroState extends State<TelaCadastro> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.savings, size: 80, color: Colors.teal),
+              const Icon(Icons.savings, size: 80, color: Colors.teal),
               const Text(
                 'Criar Conta',
                 style: TextStyle(
@@ -85,10 +87,7 @@ class _TelaCadastroState extends State<TelaCadastro> {
               const SizedBox(height: 8),
               const Text(
                 'Vamos começar a organizar suas finanças!',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey,
-                ),
+                style: TextStyle(fontSize: 14, color: Colors.grey),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 40),
