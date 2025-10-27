@@ -16,7 +16,7 @@ class _LoginState extends State<Login> {
   bool isLoading = false;
 
   // Endereço base da API
-  final String baseUrl = 'http://127.0.0.1:8000'; // ajuste conforme ambiente
+  final String baseUrl = 'http://10.0.2.2:8000'; // ajuste conforme ambiente
 
   Future<void> loginUsuario() async {
     final email = emailController.text.trim();
@@ -35,10 +35,10 @@ class _LoginState extends State<Login> {
       final dio = Dio();
 
       final response = await dio.post(
-        '$baseUrl/login',
+        '$baseUrl/auth/login',
         data: {
           'email': email,
-          'senha': senha,
+          'password': senha,
         },
         options: Options(headers: {'Content-Type': 'application/json'}),
       );
@@ -49,8 +49,8 @@ class _LoginState extends State<Login> {
         // supondo que a API retorne algo como:
         // { "usuario_id": "uuid", "token": "..." }
 
-        final usuarioId = data['usuario_id'];
-        final token = data['token'];
+        final usuarioId = data['user_id'];
+        final token = data['access_token'];
 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Login realizado com sucesso!')),
@@ -60,11 +60,14 @@ class _LoginState extends State<Login> {
         // Exemplo com shared_preferences:
         // final prefs = await SharedPreferences.getInstance();
         // await prefs.setString('auth_token', token);
-
+        print("🧾 Token recebido: $token");
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => HomePage(usuarioId: usuarioId),
+            builder: (context) => HomePage(
+              usuarioId: usuarioId,
+              token: token, // ✅ token JWT vindo da API
+            ),
           ),
         );
       } else {

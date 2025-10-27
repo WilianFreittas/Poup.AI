@@ -37,7 +37,7 @@ class _TelaCadastroState extends State<TelaCadastro> {
 
     try {
       // 🔗 Chamada ao backend via ApiService
-      final sucesso = await _apiService.cadastrarUsuario(nome, email, senha);
+      final sucesso = await _apiService.cadastrarUsuario(email, senha);
 
       if (sucesso) {
         ScaffoldMessenger.of(context).showSnackBar(

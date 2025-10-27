@@ -10,8 +10,13 @@ import 'services/api_services.dart'; // integração com FastAPI
 class HomePage extends StatefulWidget {
   /// Agora o ID vem do Supabase Auth (UUID)
   final String usuarioId;
+  final String token;
 
-  const HomePage({Key? key, required this.usuarioId}) : super(key: key);
+  const HomePage({
+    Key? key,
+    required this.usuarioId,
+    required this.token, // ✅ novo
+  }) : super(key: key);
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -27,9 +32,9 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _telas = [
-      DashboardPage(usuarioId: widget.usuarioId),
-      PoupaiPage(usuarioId: widget.usuarioId),
-      MetasPage(usuarioId: widget.usuarioId),
+      DashboardPage(usuarioId: widget.usuarioId, token: widget.token),
+      PoupaiPage(usuarioId: widget.usuarioId, token: widget.token),
+      MetasPage(usuarioId: widget.usuarioId, token: widget.token),
     ];
   }
 
@@ -40,7 +45,7 @@ class _HomePageState extends State<HomePage> {
     );
 
     try {
-      final data = await apiService.getResumoCompleto(widget.usuarioId);
+      final data = await apiService.getResumoCompleto(widget.token); // ✅ usa token
 
       // exemplo simples de exportação local
       print('📦 Dados exportados: $data');

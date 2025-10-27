@@ -35,8 +35,9 @@ class CurrencyTextInputFormatter extends TextInputFormatter {
 /// =========================================================
 class MetasPage extends StatefulWidget {
   final String usuarioId;
+  final String token;
 
-  const MetasPage({super.key, required this.usuarioId});
+  const MetasPage({super.key, required this.usuarioId, required this.token,});
 
   @override
   State<MetasPage> createState() => _MetasPageState();
@@ -53,7 +54,9 @@ class _MetasPageState extends State<MetasPage> {
   bool _carregando = true;
 
   double _getDoubleFromFormatted(String value) {
-    return double.tryParse(value.replaceAll(RegExp(r'[^\d]'), ''))! / 100;
+    final clean = value.replaceAll(RegExp(r'[^\d]'), '');
+    if (clean.isEmpty) return 0.0;
+    return double.parse(clean) / 100;
   }
 
   Color _corProgresso(double progresso) {
@@ -71,7 +74,7 @@ class _MetasPageState extends State<MetasPage> {
 
   Future<void> _carregarMetas() async {
     try {
-      final resposta = await _api.getMetas(widget.usuarioId);
+      final resposta = await _api.getMetas(widget.token);
       setState(() {
         metas = List<Map<String, dynamic>>.from(resposta);
         expandido = List.filled(metas.length, false);
@@ -97,9 +100,9 @@ class _MetasPageState extends State<MetasPage> {
 
     try {
       if (index != null) {
-        await _api.atualizarMeta(metas[index]['id'], dados);
+        await _api.atualizarMeta(widget.token, metas[index]['id'], dados);
       } else {
-        await _api.criarMeta(dados);
+        await _api.criarMeta(widget.token, dados);
       }
       await _carregarMetas();
     } catch (e) {
@@ -157,14 +160,29 @@ class _MetasPageState extends State<MetasPage> {
     );
   }
 
-  Future<void> _removerMeta(int id) async {
+  void _removerMeta(int id) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Excluir meta'),
+        content: const Text('Tem certeza que deseja excluir esta meta?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+          ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Excluir')),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
     try {
-      await _api.excluirMeta(id);
+      await _api.excluirMeta(widget.token, id);
       await _carregarMetas();
     } catch (e) {
       debugPrint("Erro ao excluir meta: $e");
     }
   }
+
 
   void _mostrarDialogValor(int index, {required bool adicionar}) {
     final controller = TextEditingController();
@@ -194,12 +212,16 @@ class _MetasPageState extends State<MetasPage> {
                   ? meta['depositado'] + valor
                   : (meta['depositado'] - valor).clamp(0.0, meta['meta']);
 
-              await _api.atualizarMeta(meta['id'], {
-                'titulo': meta['titulo'],
-                'meta': meta['meta'],
-                'depositado': novoValor,
-                'usuario_id': widget.usuarioId,
-              });
+              await _api.atualizarMeta(
+                widget.token,
+                meta['id'],
+                {
+                  'titulo': meta['titulo'],
+                  'meta': meta['meta'],
+                  'depositado': novoValor,
+                  'usuario_id': widget.usuarioId,
+                },
+              );
 
               await _carregarMetas();
               if (context.mounted) Navigator.pop(context);

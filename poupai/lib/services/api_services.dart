@@ -6,7 +6,7 @@ class ApiService {
   // =============================================
   final Dio _dio = Dio(
     BaseOptions(
-      baseUrl: "http://10.0.2.2:8000/v1", // se estiver testando no emulador Android
+      baseUrl: "http://10.0.2.2:8000", // se estiver testando no emulador Android
       connectTimeout: const Duration(seconds: 10),
       receiveTimeout: const Duration(seconds: 10),
       headers: {
@@ -19,11 +19,13 @@ class ApiService {
   // 🧾 CATEGORIAS
   // ======================================================
 
-  Future<List<dynamic>> getCategorias(String usuarioId) async {
+  Future<List<dynamic>> getCategorias(String token) async {
     try {
       final response = await _dio.get(
-        "/categorias",
-        options: Options(headers: {"usuario_id": usuarioId}),
+        "/v1/categorias",
+        options: Options(headers: {
+          "Authorization": "Bearer $token",
+        }),
       );
       return response.data;
     } on DioException catch (e) {
@@ -32,27 +34,44 @@ class ApiService {
     }
   }
 
-  Future<void> criarCategoria(Map<String, dynamic> categoria) async {
+  Future<void> criarCategoria(String token, Map<String, dynamic> categoria) async {
     try {
-      await _dio.post("/categorias", data: categoria);
+      await _dio.post(
+        "/v1/categorias",
+        data: categoria,
+        options: Options(headers: {
+          "Authorization": "Bearer $token",
+        }),
+      );
     } on DioException catch (e) {
       print("Erro ao criar categoria: ${e.response?.data ?? e.message}");
       rethrow;
     }
   }
 
-  Future<void> atualizarCategoria(int id, Map<String, dynamic> categoria) async {
+  Future<void> atualizarCategoria(String token, int id, Map<String, dynamic> categoria) async {
     try {
-      await _dio.put("/categorias/$id", data: categoria);
+      await _dio.put(
+        "/v1/categorias/$id",
+        data: categoria,
+        options: Options(headers: {
+          "Authorization": "Bearer $token",
+        }),
+      );
     } on DioException catch (e) {
       print("Erro ao atualizar categoria: ${e.response?.data ?? e.message}");
       rethrow;
     }
   }
 
-  Future<void> excluirCategoria(int id) async {
+  Future<void> excluirCategoria(String token, int id) async {
     try {
-      await _dio.delete("/categorias/$id");
+      await _dio.delete(
+        "/v1/categorias/$id",
+        options: Options(headers: {
+          "Authorization": "Bearer $token",
+        }),
+      );
     } on DioException catch (e) {
       print("Erro ao excluir categoria: ${e.response?.data ?? e.message}");
       rethrow;
@@ -63,11 +82,13 @@ class ApiService {
   // 💰 TRANSAÇÕES
   // ======================================================
 
-  Future<List<dynamic>> listarTransacoes(String usuarioId) async {
+  Future<List<dynamic>> listarTransacoes(String token) async {
     try {
       final response = await _dio.get(
-        "/transacoes",
-        options: Options(headers: {"usuario_id": usuarioId}),
+        "/v1/transacoes",
+        options: Options(headers: {
+          "Authorization": "Bearer $token",
+        }),
       );
       return response.data;
     } on DioException catch (e) {
@@ -78,7 +99,7 @@ class ApiService {
 
   Future<void> criarTransacao(Map<String, dynamic> transacao) async {
     try {
-      await _dio.post("/transacoes", data: transacao);
+      await _dio.post("/v1/transacoes", data: transacao);
     } on DioException catch (e) {
       print("Erro ao criar transação: ${e.response?.data ?? e.message}");
       rethrow;
@@ -87,7 +108,7 @@ class ApiService {
 
   Future<void> excluirTransacao(int id) async {
     try {
-      await _dio.delete("/transacoes/$id");
+      await _dio.delete("/v1/transacoes/$id");
     } on DioException catch (e) {
       print("Erro ao excluir transação: ${e.response?.data ?? e.message}");
       rethrow;
@@ -98,11 +119,13 @@ class ApiService {
   // METAS
   // ======================================================
 
-  Future<List<dynamic>> getMetas(String usuarioId) async {
+  Future<List<dynamic>> getMetas(String token) async {
     try {
       final response = await _dio.get(
-        "/metas",
-        options: Options(headers: {"usuario_id": usuarioId}),
+        "/v1/metas",
+        options: Options(headers: {
+          "Authorization": "Bearer $token",
+        }),
       );
       return response.data;
     } on DioException catch (e) {
@@ -111,27 +134,44 @@ class ApiService {
     }
   }
 
-  Future<void> criarMeta(Map<String, dynamic> meta) async {
+  Future<void> criarMeta(String token, Map<String, dynamic> meta) async {
     try {
-      await _dio.post("/metas", data: meta);
+      await _dio.post(
+        "/v1/metas",
+        data: meta,
+        options: Options(headers: {
+          "Authorization": "Bearer $token",
+        }),
+      );
     } on DioException catch (e) {
       print("Erro ao criar meta: ${e.response?.data ?? e.message}");
       rethrow;
     }
   }
 
-  Future<void> atualizarMeta(int id, Map<String, dynamic> meta) async {
+  Future<void> atualizarMeta(String token, int id, Map<String, dynamic> meta) async {
     try {
-      await _dio.put("/metas/$id", data: meta);
+      await _dio.put(
+        "/v1/metas/$id",
+        data: meta,
+        options: Options(headers: {
+          "Authorization": "Bearer $token",
+        }),
+      );
     } on DioException catch (e) {
       print("Erro ao atualizar meta: ${e.response?.data ?? e.message}");
       rethrow;
     }
   }
 
-  Future<void> excluirMeta(int id) async {
+  Future<void> excluirMeta(String token, int id) async {
     try {
-      await _dio.delete("/metas/$id");
+      await _dio.delete(
+        "/v1/metas/$id",
+        options: Options(headers: {
+          "Authorization": "Bearer $token",
+        }),
+      );
     } on DioException catch (e) {
       print("Erro ao excluir meta: ${e.response?.data ?? e.message}");
       rethrow;
@@ -142,12 +182,14 @@ class ApiService {
   // ANALYTICS (RESUMO FINANCEIRO)
   // ======================================================
 
-  Future<Map<String, dynamic>> getResumo(int ano, int mes, String usuarioId) async {
+  Future<Map<String, dynamic>> getResumo(int ano, int mes, String token) async {
     try {
       final response = await _dio.get(
-        "/analytics/resumo",
+        "/v1/analytics/resumo",
         queryParameters: {"ano": ano, "mes": mes},
-        options: Options(headers: {"usuario_id": usuarioId}),
+        options: Options(headers: {
+          "Authorization": "Bearer $token",
+        }),
       );
       return response.data;
     } on DioException catch (e) {
@@ -160,12 +202,16 @@ class ApiService {
   // INTELIGÊNCIA ARTIFICIAL
   // ======================================================
 
-  Future<String> enviarMensagemIA(String usuarioId, String mensagem) async {
+  Future<String> enviarMensagemIA(String token, String mensagem, int ano, int mes) async {
     try {
       final response = await _dio.post(
-        "/ia/chat",
-        data: {"mensagem": mensagem},
-        options: Options(headers: {"usuario_id": usuarioId}),
+        "/v1/ia/chat",
+        data: {
+          "mensagem": mensagem,
+          "ano": ano,
+          "mes": mes,
+        },
+        options: Options(headers: {"Authorization": "Bearer $token"}),
       );
       return response.data["resposta"];
     } on DioException catch (e) {
@@ -176,11 +222,13 @@ class ApiService {
   // ======================================================
   // EXPORTAÇÃO / RESUMO COMPLETO
   // ======================================================
-  Future<List<dynamic>> getResumoCompleto(String usuarioId) async {
+  Future<List<dynamic>> getResumoCompleto(String token) async {
     try {
       final response = await _dio.get(
-        "/analytics/resumo_completo", // ou "/analytics/export", conforme seu backend
-        options: Options(headers: {"usuario_id": usuarioId}),
+        "/v1/analytics/resumo_completo", // ou "/analytics/export", conforme seu backend
+        options: Options(headers: {
+          "Authorization": "Bearer $token",
+        }),
       );
       return response.data;
     } on DioException catch (e) {
@@ -191,14 +239,13 @@ class ApiService {
   // ======================================================
   // 🧾 CADASTRO DE USUÁRIO
   // ======================================================
-  Future<bool> cadastrarUsuario(String nome, String email, String senha) async {
+  Future<bool> cadastrarUsuario(String email, String senha) async {
     try {
       final response = await _dio.post(
         "/auth/register",
         data: {
-          "nome": nome,
           "email": email,
-          "senha": senha,
+          "password": senha,
         },
       );
 

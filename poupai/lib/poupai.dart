@@ -4,8 +4,13 @@ import '../services/api_services.dart';
 
 class PoupaiPage extends StatefulWidget {
   final String usuarioId;
+  final String token;
 
-  const PoupaiPage({required this.usuarioId, Key? key}) : super(key: key);
+  const PoupaiPage({
+    required this.usuarioId,
+    required this.token, // ✅ novo
+    Key? key,
+  }) : super(key: key);
 
   @override
   State<PoupaiPage> createState() => _PoupaiPageState();
@@ -79,8 +84,12 @@ class _PoupaiPageState extends State<PoupaiPage> {
   // ======================================================
   Future<void> _obterRespostaIA(String texto) async {
     try {
-      final resposta =
-      await _apiService.enviarMensagemIA(widget.usuarioId, texto);
+      final resposta = await _apiService.enviarMensagemIA(
+        widget.token, // ✅ JWT token
+        texto,
+        DateTime.now().year,
+        DateTime.now().month,
+      );
 
       final dataHora = DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now());
       final msgBot = {
