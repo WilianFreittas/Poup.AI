@@ -55,6 +55,45 @@ class PieChartWidget extends StatelessWidget {
   }
 }
 
+/// 🔄 Converte nome de ícone (string) vindo da API em IconData
+IconData getIconFromName(String nome) {
+  const mapaCompleto = {
+    'Restaurante': Icons.restaurant,
+    'Carro': Icons.directions_car,
+    'Casa': Icons.home,
+    'Lazer': Icons.sports_esports,
+    'Mercado': Icons.shopping_cart,
+    'Outros': Icons.category,
+    'Educação': Icons.school,
+    'Saúde': Icons.local_hospital,
+    'Tecnologia': Icons.devices,
+    'Viagem': Icons.flight,
+    'Entretenimento': Icons.movie,
+    'Fitness': Icons.fitness_center,
+    'Pets': Icons.pets,
+    'Presentes': Icons.card_giftcard,
+    'Beleza': Icons.brush,
+    'Investimentos': Icons.trending_up,
+    'Serviços': Icons.build,
+    'Esportes': Icons.sports,
+    // Ícones de entrada
+    'Salário': Icons.attach_money,
+    'Freelancer': Icons.work,
+    'Rendimentos': Icons.trending_up,
+    'Reembolso': Icons.replay,
+    'InvestimentosEntrada': Icons.account_balance,
+  };
+
+  for (final entry in mapaCompleto.entries) {
+    if (entry.key.toLowerCase() == nome.toLowerCase()) {
+      return entry.value;
+    }
+  }
+
+  return Icons.help; // fallback se não encontrar
+}
+
+
 /// =========================================================
 /// WIDGET: LISTA DE CATEGORIAS (GASTOS / ENTRADAS)
 /// =========================================================
@@ -97,11 +136,7 @@ class CategoriaListWidget extends StatelessWidget {
             : Color(int.tryParse(categoria['cor'].toString()) ?? 0xFF9E9E9E);
         final icone = categoria['icone'] is IconData
             ? categoria['icone'] as IconData
-            : IconData(
-          int.tryParse(categoria['icone'].toString()) ??
-              Icons.category.codePoint,
-          fontFamily: 'MaterialIcons',
-        );
+            : getIconFromName(categoria['icone']?.toString() ?? 'Outros');
 
         return AnimatedContainer(
           duration: const Duration(milliseconds: 200),

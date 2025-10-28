@@ -28,6 +28,10 @@ environment:
 # the latest version available on pub.dev. To see which dependencies have newer
 # versions available, run `flutter pub outdated`.
 dependencies:
+
+  path_provider: ^2.1.2
+  permission_handler: ^11.0.1
+  shared_preferences: ^2.3.2
   flutter:
     sdk: flutter
   flutter_localizations:
@@ -46,6 +50,8 @@ dependencies:
   sqflite_common_ffi: ^2.3.0+2
   flutter_launcher_icons: ^0.14.4
   dio: ^5.5.0
+  http: ^1.5.0
+  open_filex: ^4.7.0
 
 
 

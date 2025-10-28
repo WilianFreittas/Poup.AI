@@ -6,6 +6,12 @@ import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import '../services/api_services.dart';
 import 'dashboard_widgets.dart';
 
+String colorToHex(Color c) {
+  // Ex.: Color(0xFF006155) -> "#006155"
+  final v = c.value.toRadixString(16).padLeft(8, '0'); // AARRGGBB
+  return '#${v.substring(2).toUpperCase()}'; // RRGGBB
+}
+
 /// Formatter de moeda BR (R$) para TextField
 class CurrencyTextInputFormatter extends TextInputFormatter {
   CurrencyTextInputFormatter({this.locale = 'pt_BR', this.symbol = 'R\$'});
@@ -141,49 +147,73 @@ class _DashboardPageState extends State<DashboardPage> {
   Future<void> carregarCategoriasDoBanco() async {
     try {
       final mesNum = meses.indexOf(mesSelecionado) + 1;
-      final resumo = await api.getResumo(anoSelecionado, mesNum, widget.token);
 
-      final categorias = (resumo["categorias"] ?? []) as List<dynamic>;
+      final categorias = await api.getCategorias(widget.token);
+      final transacoes = await api.getTransacoes(widget.token, anoSelecionado, mesNum);
 
-      dadosPorPeriodo[periodoAtual] = categorias.map<Map<String, dynamic>>((cat) {
-        final corStr = cat['cor']?.toString() ?? '0';
-        final corInt = int.tryParse(corStr) ?? 0xFF9E9E9E;
-        final iconeInt = int.tryParse(cat['icone']?.toString() ?? '') ?? Icons.help.codePoint;
+      final agrupado = <String, Map<String, dynamic>>{};
 
-        return {
-          'id': cat['id'],
-          'categoria': cat['nome'],
-          'valor': (cat['valor'] ?? 0).toDouble(),
-          'cor': Color(corInt),
-          'icone': IconData(iconeInt, fontFamily: 'MaterialIcons'),
-          'tipo': cat['tipo'],
-          'data': cat['data'],
-          'usuario_id': cat['usuario_id'],
-        };
-      }).toList();
+      for (var trans in transacoes) {
+        final categoriaId = trans['categoria_id'];
+        final cat = categorias.firstWhere(
+              (c) => c['id'] == categoriaId,
+          orElse: () => {'nome': 'Sem Categoria', 'cor': '#9E9E9E', 'icone': 'Outros'},
+        );
 
+        final tipo = trans['tipo_transacao'] == 'receita' ? 'Entrada' : 'Gasto';
+        final valor = double.tryParse(trans['valor_transacao'].toString()) ?? 0.0;
+        final corStr = cat['cor'].toString();
+        final cor = corStr.startsWith('#')
+            ? Color(int.parse(corStr.substring(1), radix: 16) + 0xFF000000)
+            : Color(int.tryParse(corStr) ?? 0xFF9E9E9E);
+        final nome = trans['observacao'] ?? cat['nome'];
+        final iconeStr = cat['icone']?.toString() ?? 'Outros'; // nome do ícone vindo da API
+
+        agrupado.putIfAbsent(nome, () => {
+          'id': categoriaId,
+          'transacao_id': trans['id'],
+          'categoria': nome,
+          'valor': 0.0,
+          'tipo': tipo,
+          'cor': cor,
+          'icone': getIconFromName(iconeStr), // ✅ converte nome -> IconData correto
+        });
+        agrupado[nome]!['valor'] += valor;
+      }
+
+      dadosPorPeriodo[periodoAtual] = agrupado.values.toList();
       setState(() {});
     } catch (e) {
-      // Em produção: trate melhor (dialog/telemetria)
-      debugPrint("Erro ao carregar categorias: $e");
+      debugPrint("Erro ao carregar dados: $e");
     }
   }
 
-  Future<void> _excluirCategoria(int id) async {
-    await api.excluirCategoria(widget.token, id);
-    await carregarCategoriasDoBanco();
-    setState(() {});
+  Future<void> _excluirTransacao(int id) async {
+    try {
+      await api.excluirTransacao(widget.token, id);
+      await carregarCategoriasDoBanco();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Transação excluída com sucesso!')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erro ao excluir transação: $e')),
+      );
+    }
   }
 
-  Future<void> _salvarCategoria(Map<String, dynamic> categoria) async {
-    // Decide com base na existência de 'id'
-    if (categoria.containsKey('id') && categoria['id'] != null) {
-      await api.atualizarCategoria(widget.token, categoria['id'], categoria);
-    } else {
-      await api.criarCategoria(widget.token, categoria);
+  Color obterProximaCorDisponivel() {
+    final usadas = (dadosPorPeriodo[periodoAtual] ?? [])
+        .map((c) => (c['cor'] as Color).value)
+        .toSet();
+
+    for (final cor in coresDisponiveis) {
+      if (!usadas.contains(cor.value)) {
+        return cor;
+      }
     }
-    await carregarCategoriasDoBanco();
-    setState(() {});
+    // 🔴 fallback se todas estiverem usadas
+    return Colors.grey;
   }
 
   // ================== Diálogo de Cadastro/Edição ==================
@@ -198,7 +228,9 @@ class _DashboardPageState extends State<DashboardPage> {
     String tipoSelecionado = (categoria?['tipo'] ?? 'Gasto') as String;
     String nome = (categoria?['categoria'] ?? '') as String;
     final double valorAtual = (categoria?['valor'] ?? 0.0) as double;
-    Color corSelecionada = (categoria?['cor'] ?? Colors.blue) as Color;
+    Color corSelecionada = categoria?['cor'] != null
+        ? categoria!['cor'] as Color
+        : obterProximaCorDisponivel();
 
     // Ícones por tipo
     Map<String, IconData> iconesUsados =
@@ -261,15 +293,23 @@ class _DashboardPageState extends State<DashboardPage> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: ['Adicionar', 'Remover'].map((op) {
-                      final selecionado = operacao == op;
+                      final bool selecionado = operacao == op;
+                      final bool ehAdicionar = op == 'Adicionar';
+
                       return Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 8),
                         child: ElevatedButton(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: selecionado ? Colors.green : Colors.grey[300],
-                            foregroundColor: Colors.black,
+                            backgroundColor: selecionado
+                                ? (ehAdicionar ? Colors.green : Colors.redAccent)
+                                : Colors.grey[300],
+                            foregroundColor: selecionado ? Colors.white : Colors.black,
                           ),
-                          onPressed: () => setStateDialog(() => operacao = op),
+                          onPressed: () {
+                            setStateDialog(() {
+                              operacao = op; // ✅ Atualiza corretamente
+                            });
+                          },
                           child: Text(op),
                         ),
                       );
@@ -300,29 +340,60 @@ class _DashboardPageState extends State<DashboardPage> {
                       const SizedBox(width: 10),
                       GestureDetector(
                         onTap: () {
+                          final usadas = (dadosPorPeriodo[periodoAtual] ?? [])
+                              .where((c) => !isEditando || c['id'] != idCategoria)
+                              .map((c) {
+                            final valor = c['cor'];
+                            if (valor is Color) return valor.value;
+                            if (valor is String && valor.startsWith('#')) {
+                              return int.parse(valor.substring(1), radix: 16) + 0xFF000000;
+                            }
+                            if (valor is String && valor.isNotEmpty) {
+                              return int.tryParse(valor) ?? 0;
+                            }
+                            return Colors.transparent.value;
+                          })
+                              .toSet();
                           showDialog(
                             context: context,
                             builder: (_) => AlertDialog(
                               title: const Text('Escolha uma cor'),
-                              content: BlockPicker(
-                                pickerColor: corSelecionada,
-                                onColorChanged: (color) {
-                                  // Bloqueio de cores já usadas no período (exceto a própria ao editar)
-                                  final usadas = (dadosPorPeriodo[periodoAtual] ?? [])
-                                      .where((c) => !isEditando || c['id'] != idCategoria)
-                                      .map((c) => (c['cor'] as Color).value)
-                                      .toSet();
-
-                                  if (usadas.contains(color.value)) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('Essa cor já está sendo usada neste período.')),
+                              content: SingleChildScrollView(
+                                child: Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: coresDisponiveis.map((color) {
+                                    final bloqueada = usadas.any((u) => (u & 0xFFFFFF) == (color.value & 0xFFFFFF));
+                                    return GestureDetector(
+                                      onTap: bloqueada
+                                          ? null
+                                          : () {
+                                        setStateDialog(() => corSelecionada = color);
+                                        setState(() {});
+                                        Navigator.pop(context);
+                                      },
+                                      child: Container(
+                                        width: 30,
+                                        height: 30,
+                                        decoration: BoxDecoration(
+                                          color: color.withOpacity(bloqueada ? 0.3 : 1.0),
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: bloqueada
+                                                ? Colors.redAccent.withOpacity(0.5)
+                                                : Colors.grey.shade400,
+                                            width: bloqueada ? 2 : 1,
+                                          ),
+                                        ),
+                                        child: bloqueada
+                                            ? const Icon(Icons.block, color: Colors.white, size: 16)
+                                            : (color == corSelecionada
+                                            ? const Icon(Icons.check, color: Colors.white, size: 16)
+                                            : null),
+                                      ),
                                     );
-                                    return;
-                                  }
-
-                                  setStateDialog(() => corSelecionada = color);
-                                  Navigator.pop(context);
-                                },
+                                  }).toList(),
+                                ),
                               ),
                             ),
                           );
@@ -331,7 +402,7 @@ class _DashboardPageState extends State<DashboardPage> {
                           width: 24,
                           height: 24,
                           decoration: BoxDecoration(
-                            color: corSelecionada,
+                            color: corSelecionada ?? obterProximaCorDisponivel(),
                             borderRadius: BorderRadius.circular(4),
                             border: Border.all(color: Colors.grey),
                           ),
@@ -396,36 +467,96 @@ class _DashboardPageState extends State<DashboardPage> {
                     DateTime(anoSelecionado, meses.indexOf(mesSelecionado) + 1, 1),
                   );
 
-                  // Monta payload coerente com API (enviando o valor final)
-                  final iconeCodePoint = (tipoSelecionado == 'Entrada'
-                      ? iconesEntrada[iconeSelecionado]
-                      : iconesDisponiveis[iconeSelecionado])
-                      ?.codePoint ??
-                      Icons.category.codePoint;
-
-                  final payloadBase = {
-                    'nome': nomeFinal,
-                    'tipo': tipoSelecionado,
-                    'valor': novoValor, // valor final após ajuste
-                    'cor': corSelecionada.value.toString(), // API espera string
-                    'icone': iconeCodePoint,
-                    'usuario_id': widget.usuarioId,
-                    'data': dataSelecionada,
-                  };
-
                   if (isEditando) {
-                    await _salvarCategoria({'id': idCategoria, ...payloadBase});
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Categoria atualizada com sucesso!')),
-                    );
+                    // ✅ ID da transação (não da categoria)
+                    final transacaoId = categoria?['transacao_id'] ?? 1;
+                    final categoriaId = categoria?['id'] ?? idCategoria ?? 1;
+
+                    // ✅ Só tenta atualizar a categoria se o ID for válido
+                    if (categoriaId != null && categoriaId > 0) {
+                      try {
+                        await api.atualizarCategoria(
+                          widget.token,
+                          categoriaId,
+                          {
+                            'cor': colorToHex(corSelecionada),// Exemplo: "#8BC34A"
+                            'icone': iconeSelecionado,
+                            'nome': nomeFinal,
+                            // Se quiser, pode incluir ícone ou nome aqui também
+                          },
+                        );
+                      } catch (e) {
+                        debugPrint('⚠️ Aviso: falha ao atualizar categoria no backend: $e');
+                      }
+                    }
+
+                    // 💰 Atualiza a transação
+                    final payload = {
+                      'usuario_id': widget.usuarioId,
+                      'categoria_id': categoriaId,
+                      'tipo_transacao': tipoSelecionado == 'Entrada' ? 'receita' : 'despesa',
+                      'valor_transacao': novoValor,
+                      'data_transacao': dataSelecionada,
+                      'observacao': nomeFinal,
+                      'cor': colorToHex(corSelecionada),
+                      'icone': iconeSelecionado,
+                      'nome': nomeFinal,
+                    };
+
+                    await api.atualizarTransacao(widget.token, transacaoId, payload);
+
+                    await carregarCategoriasDoBanco();
+                    if (context.mounted) {
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Transação atualizada com sucesso!')),
+                      );
+                    }
+
                   } else {
-                    await _salvarCategoria(payloadBase);
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Categoria criada com sucesso!')),
-                    );
+                    // 🆕 Criação de nova transação
+                    final categoriaId = idCategoria ?? categoria?['id'] ?? 1;
+
+                    // 🚫 Não atualiza categoria aqui — ela será criada automaticamente no backend
+                    final corFinal = corSelecionada ?? obterProximaCorDisponivel();
+
+                    final payload = {
+                      'usuario_id': widget.usuarioId,
+                      'categoria_id': categoria?['id'] ?? idCategoria ?? 1,
+                      'tipo_transacao': tipoSelecionado == 'Entrada' ? 'receita' : 'despesa',
+                      'valor_transacao': novoValor,
+                      'data_transacao': dataSelecionada,
+                      'observacao': nomeFinal,
+                      'cor': colorToHex(corFinal),
+                      'icone': iconeSelecionado,
+                      'nome': nomeFinal,
+                    };
+
+                    debugPrint("🟢 Cor final escolhida: ${colorToHex(corFinal)}");
+
+                    await api.criarTransacao(widget.token, payload);
+
+                    await carregarCategoriasDoBanco();
+                    if (context.mounted) {
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Transação criada com sucesso!')),
+                      );
+                    }
                   }
+                  setState(() {
+                    final categoriaId = idCategoria ?? categoria?['id'] ?? 1;
+                    final lista = dadosPorPeriodo[periodoAtual];
+                    if (lista != null) {
+                      final idx = lista.indexWhere((c) => c['id'] == categoriaId);
+                      if (idx != -1) {
+                        lista[idx]['cor'] = corSelecionada; // <- refletir de imediato
+                        // Se estiver editando nome/ícone também:
+                        // lista[idx]['categoria'] = nomeFinal;
+                        // lista[idx]['icone'] = IconData(iconesUsados[iconeSelecionado]!.codePoint, fontFamily: 'MaterialIcons');
+                      }
+                    }
+                  });
 
                   await carregarCategoriasDoBanco();
                   setState(() {});
@@ -454,9 +585,9 @@ class _DashboardPageState extends State<DashboardPage> {
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
-              await _excluirCategoria(id);
+              await _excluirTransacao(id);
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Categoria excluída com sucesso.')),
+                const SnackBar(content: Text('Transação excluída com sucesso!')),
               );
             },
             child: const Text('Excluir', style: TextStyle(color: Colors.red)),
@@ -627,7 +758,7 @@ class _DashboardPageState extends State<DashboardPage> {
           categorias: categorias.where((c) => c['tipo'] == 'Gasto').toList(),
           onExcluir: (i) {
             final lista = categorias.where((c) => c['tipo'] == 'Gasto').toList();
-            _confirmarExcluirCategoria(lista[i]['id']);
+            _confirmarExcluirCategoria(lista[i]['transacao_id']);
           },
           onEditar: (i) {
             final lista = categorias.where((c) => c['tipo'] == 'Gasto').toList();
@@ -641,7 +772,7 @@ class _DashboardPageState extends State<DashboardPage> {
           categorias: categorias.where((c) => c['tipo'] == 'Entrada').toList(),
           onExcluir: (i) {
             final lista = categorias.where((c) => c['tipo'] == 'Entrada').toList();
-            _confirmarExcluirCategoria(lista[i]['id']);
+            _confirmarExcluirCategoria(lista[i]['transacao_id']);
           },
           onEditar: (i) {
             final lista = categorias.where((c) => c['tipo'] == 'Entrada').toList();
@@ -680,7 +811,10 @@ class _DashboardPageState extends State<DashboardPage> {
       ),
       floatingActionButton: FloatingActionButton(
         heroTag: 'addCategoria',
-        onPressed: () => _abrirCadastroCategoria(),
+        onPressed: () async {
+          await carregarCategoriasDoBanco();
+          _abrirCadastroCategoria();
+        },
         backgroundColor: const Color(0xFF006155),
         child: const Icon(Icons.add),
       ),
