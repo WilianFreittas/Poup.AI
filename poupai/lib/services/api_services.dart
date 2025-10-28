@@ -15,8 +15,8 @@ class ApiService {
   final Dio _dio = Dio(
     BaseOptions(
       baseUrl: "http://10.0.2.2:8000",
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 10),
+      connectTimeout: const Duration(seconds: 15),
+      receiveTimeout: const Duration(seconds: 30),
       headers: {
         "Content-Type": "application/json",
       },
@@ -363,14 +363,26 @@ class ApiService {
   // ======================================================
   // 🤖 INTELIGÊNCIA ARTIFICIAL
   // ======================================================
-  Future<String> enviarMensagemIA(String token, String mensagem, int ano, int mes) async {
+  Future<String> enviarMensagemIA(String token, String mensagem, {int? ano, int? mes}) async {
     try {
+      // monta o corpo da requisição dinamicamente
+      final Map<String, dynamic> data = {"mensagem": mensagem};
+      if (ano != null) data["ano"] = ano;
+      if (mes != null) data["mes"] = mes;
+
       final response = await _dio.post(
         "/v1/ia/chat",
-        data: {"mensagem": mensagem, "ano": ano, "mes": mes},
-        options: Options(headers: {"Authorization": "Bearer $token"}),
+        data: data,
+        options: Options(
+          headers: {"Authorization": "Bearer $token"},
+        ),
       );
-      return response.data["resposta"];
+
+      if (response.statusCode == 200 && response.data["resposta"] != null) {
+        return response.data["resposta"];
+      } else {
+        throw Exception("Resposta inválida da IA: ${response.data}");
+      }
     } on DioException catch (e) {
       print("❌ Erro ao comunicar com IA: ${e.response?.data ?? e.message}");
       rethrow;

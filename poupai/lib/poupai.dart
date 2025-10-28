@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/api_services.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 
 class PoupaiPage extends StatefulWidget {
   final String usuarioId;
@@ -8,7 +9,7 @@ class PoupaiPage extends StatefulWidget {
 
   const PoupaiPage({
     required this.usuarioId,
-    required this.token, // ✅ novo
+    required this.token,
     Key? key,
   }) : super(key: key);
 
@@ -84,11 +85,17 @@ class _PoupaiPageState extends State<PoupaiPage> {
   // ======================================================
   Future<void> _obterRespostaIA(String texto) async {
     try {
+      final agora = DateTime.now();
+      final bool perguntaFinanceira = texto.toLowerCase().contains("gasto") ||
+          texto.toLowerCase().contains("despesa") ||
+          texto.toLowerCase().contains("saldo") ||
+          texto.toLowerCase().contains("meta");
+
       final resposta = await _apiService.enviarMensagemIA(
-        widget.token, // ✅ JWT token
+        widget.token,
         texto,
-        DateTime.now().year,
-        DateTime.now().month,
+        ano: perguntaFinanceira ? agora.year : null,
+        mes: perguntaFinanceira ? agora.month : null,
       );
 
       final dataHora = DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now());
@@ -143,6 +150,7 @@ class _PoupaiPageState extends State<PoupaiPage> {
 
                 final mensagem = _mensagens[index];
                 final isUsuario = mensagem['tipo'] == 'usuario';
+
                 return Align(
                   alignment:
                   isUsuario ? Alignment.centerRight : Alignment.centerLeft,
@@ -153,9 +161,22 @@ class _PoupaiPageState extends State<PoupaiPage> {
                       color: isUsuario ? Colors.blue[100] : Colors.green[100],
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Text(
+                    // 🔹 Usa MarkdownBody para mensagens da IA
+                    child: isUsuario
+                        ? Text(
                       mensagem['texto'] ?? '',
                       style: const TextStyle(fontSize: 15),
+                    )
+                        : MarkdownBody(
+                      data: mensagem['texto'] ?? '',
+                      styleSheet:
+                      MarkdownStyleSheet.fromTheme(Theme.of(context))
+                          .copyWith(
+                        p: const TextStyle(fontSize: 15),
+                        strong: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87),
+                      ),
                     ),
                   ),
                 );
