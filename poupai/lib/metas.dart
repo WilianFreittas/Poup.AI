@@ -230,8 +230,16 @@ class _MetasPageState extends State<MetasPage> {
                 'usuario_id': widget.usuarioId,
               };
 
-              await _api.atualizarMeta(widget.token, meta['id'], dados);
-              await _carregarMetas();
+              try {
+                if (adicionar) {
+                  await _api.aportarMeta(widget.token, meta['id'], valor);
+                } else {
+                  await _api.retirarMeta(widget.token, meta['id'], valor);
+                }
+                await _carregarMetas();
+              } catch (e) {
+                debugPrint("Erro ao registrar movimentação: $e");
+              }
               if (context.mounted) Navigator.pop(context);
             },
           ),

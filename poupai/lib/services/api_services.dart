@@ -213,9 +213,9 @@ class ApiService {
     }
   }
 
-  // ======================================================
-  // 🎯 METAS
-  // ======================================================
+// ======================================================
+// 🎯 METAS
+// ======================================================
   Future<List<dynamic>> getMetas(String token) async {
     try {
       final response = await _dio.get(
@@ -266,6 +266,45 @@ class ApiService {
       rethrow;
     }
   }
+
+// ======================================================
+// 💰 APORTAR META
+// ======================================================
+  Future<void> aportarMeta(String token, int metaId, double valor) async {
+    try {
+      final response = await _dio.post(
+        "/v1/metas/$metaId/aportar",
+        data: {'valor': valor},
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+      if (response.statusCode != 200) {
+        throw Exception('Erro ao aportar meta');
+      }
+    } on DioException catch (e) {
+      print("❌ Erro ao aportar meta: ${e.response?.data ?? e.message}");
+      rethrow;
+    }
+  }
+
+// ======================================================
+// 💸 RETIRAR META
+// ======================================================
+  Future<void> retirarMeta(String token, int metaId, double valor) async {
+    try {
+      final response = await _dio.post(
+        "/v1/metas/$metaId/retirar",
+        data: {'valor': valor},
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+      if (response.statusCode != 200) {
+        throw Exception('Erro ao retirar meta');
+      }
+    } on DioException catch (e) {
+      print("❌ Erro ao retirar meta: ${e.response?.data ?? e.message}");
+      rethrow;
+    }
+  }
+
 
   // ======================================================
   // 📊 ANALYTICS
