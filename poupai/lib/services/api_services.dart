@@ -11,10 +11,10 @@ class ApiService {
   // =============================================
   // 🔗 CONFIGURAÇÃO BÁSICA DO CLIENTE DIO
   // =============================================
-  final String baseUrl = "http://10.0.2.2:8000"; // Emulador Android (localhost)
+  final String baseUrl = "http://127.0.0.1:8000"; // Emulador Android (localhost)
   final Dio _dio = Dio(
     BaseOptions(
-      baseUrl: "http://10.0.2.2:8000",
+      baseUrl: "http://127.0.0.1:8000",
       connectTimeout: const Duration(seconds: 15),
       receiveTimeout: const Duration(seconds: 30),
       headers: {
