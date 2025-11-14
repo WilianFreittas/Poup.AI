@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
-import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import '../services/api_services.dart';
 import 'dashboard_widgets.dart';
 
@@ -1058,9 +1057,9 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),
-        child: Column(
+        child: ListView(
           children: [
-            // Seletor de período modernizado
+            // 🔹 Seletor de período modernizado
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -1113,9 +1112,10 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
                 ],
               ),
             ),
+
             const SizedBox(height: 20),
 
-            // Cards de resumo
+            // 🔹 Cards de resumo (agora scrollam junto)
             Row(
               children: [
                 Expanded(
@@ -1144,19 +1144,16 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
               saldo >= 0 ? Icons.check_circle : Icons.warning,
               saldo >= 0 ? const Color(0xFF006155) : Colors.orange,
             ),
+
             const SizedBox(height: 20),
 
-            Expanded(
-              child: ListView(
-                children: [
-                  if (modoSelecionado == 'Dashboard')
-                    _construirDashboard()
-                  else
-                    _construirGraficoDeBarras(),
-                  const SizedBox(height: 100),
-                ],
-              ),
-            ),
+            // 🔹 Conteúdo principal (Dashboard ou Gráfico)
+            if (modoSelecionado == 'Dashboard')
+              _construirDashboard()
+            else
+              _construirGraficoDeBarras(),
+
+            const SizedBox(height: 100),
           ],
         ),
       ),
