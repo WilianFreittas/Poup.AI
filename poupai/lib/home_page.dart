@@ -37,9 +37,7 @@ class _HomePageState extends State<HomePage> {
     ];
   }
 
-  // ======================================================
-  // 📤 EXPORTAR DADOS (PDF)
-  // ======================================================
+  // EXPORTAÇÃO
   Future<void> _exportarDados() async {
     int anoSelecionado = DateTime.now().year;
     int mesSelecionado = DateTime.now().month;
@@ -58,7 +56,7 @@ class _HomePageState extends State<HomePage> {
                     value: anoSelecionado,
                     isExpanded: true,
                     items: [2023, 2024, 2025, 2026, 2027]
-                        .map((ano) => DropdownMenuItem<int>(
+                        .map((ano) => DropdownMenuItem(
                       value: ano,
                       child: Text(ano.toString()),
                     ))
@@ -75,7 +73,7 @@ class _HomePageState extends State<HomePage> {
                     isExpanded: true,
                     items: List.generate(
                       12,
-                          (i) => DropdownMenuItem<int>(
+                          (i) => DropdownMenuItem(
                         value: i + 1,
                         child: Text('${i + 1} - ${_nomeMes(i + 1)}'),
                       ),
@@ -110,16 +108,25 @@ class _HomePageState extends State<HomePage> {
 
   String _nomeMes(int mes) {
     const meses = [
-      'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-      'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+      'Janeiro',
+      'Fevereiro',
+      'Março',
+      'Abril',
+      'Maio',
+      'Junho',
+      'Julho',
+      'Agosto',
+      'Setembro',
+      'Outubro',
+      'Novembro',
+      'Dezembro'
     ];
     return meses[mes - 1];
   }
 
   Future<void> _confirmarExportacao(int ano, int mes) async {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('🔄 Gerando PDF de $mes/$ano...')),
-    );
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text('🔄 Gerando PDF de $mes/$ano...')));
 
     try {
       await apiService.exportarPdf(
@@ -130,7 +137,7 @@ class _HomePageState extends State<HomePage> {
       );
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('✅ PDF de $mes/$ano salvo na pasta Downloads!')),
+        SnackBar(content: Text('✅ PDF salvo na pasta Downloads!')),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -139,26 +146,40 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  // ======================================================
-  // 🧭 INTERFACE PRINCIPAL
-  // ======================================================
+  // INTERFACE PRINCIPAL
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Poup.AI'),
+        backgroundColor: const Color(0xFF006155),
+        elevation: 0,
         leading: Builder(
           builder: (context) => IconButton(
-            icon: const Icon(Icons.menu),
+            icon: const Icon(Icons.menu, color: Colors.white),
             onPressed: () => Scaffold.of(context).openDrawer(),
           ),
         ),
+        title: Row(
+          children: const [
+            Icon(Icons.savings, size: 28, color: Colors.white),
+            SizedBox(width: 8),
+            Text(
+              "Poup.AI",
+              style: TextStyle(
+                fontFamily: "Poppins",
+                fontWeight: FontWeight.w700,
+                fontSize: 22,
+                color: Colors.white,
+              ),
+            ),
+          ],
+        ),
       ),
+
       drawer: Drawer(
         child: ListView(
           padding: EdgeInsets.zero,
           children: [
-            // 🪪 Cabeçalho do menu lateral
             DrawerHeader(
               decoration: const BoxDecoration(color: Color(0xFF006155)),
               child: Column(
@@ -167,16 +188,21 @@ class _HomePageState extends State<HomePage> {
                   CircleAvatar(
                     backgroundColor: Colors.white,
                     radius: 30,
-                    child: Icon(Icons.person, size: 40, color: Color(0xFF006155)),
+                    child: Icon(Icons.person,
+                        size: 40, color: Color(0xFF006155)),
                   ),
                   SizedBox(height: 10),
-                  Text('Bem-vindo(a) ao Poup.AI',
-                      style: TextStyle(color: Colors.white, fontSize: 18)),
+                  Text(
+                    'Bem-vindo(a) ao Poup.AI',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontFamily: "Poppins",
+                    ),
+                  ),
                 ],
               ),
             ),
-
-            // ⚙️ Opções do menu
             ListTile(
               leading: const Icon(Icons.person_outline),
               title: const Text('Perfil'),
@@ -184,10 +210,8 @@ class _HomePageState extends State<HomePage> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => PerfilPage(
-                      usuarioId: widget.usuarioId,
-                      token: widget.token,
-                    ),
+                    builder: (_) =>
+                        PerfilPage(usuarioId: widget.usuarioId, token: widget.token),
                   ),
                 );
               },
@@ -229,20 +253,20 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
 
-      // Corpo principal
       body: IndexedStack(
         index: _paginaAtual,
         children: _telas,
       ),
 
-      // Barra de navegação inferior
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _paginaAtual,
         selectedItemColor: const Color(0xFF006155),
         onTap: (index) => setState(() => _paginaAtual = index),
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.pie_chart), label: 'Dashboard'),
-          BottomNavigationBarItem(icon: Icon(Icons.chat_bubble_outline), label: 'Poup.ai'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.pie_chart), label: 'Dashboard'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.chat_bubble_outline), label: 'Poup.ai'),
           BottomNavigationBarItem(icon: Icon(Icons.flag), label: 'Metas'),
         ],
       ),

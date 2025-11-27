@@ -31,7 +31,7 @@ class CurrencyTextInputFormatter extends TextInputFormatter {
 }
 
 /// ======================================================
-/// TELA DE METAS (API VERSION)
+/// TELA DE METAS
 /// ======================================================
 class MetasPage extends StatefulWidget {
   final String usuarioId;
@@ -45,12 +45,18 @@ class MetasPage extends StatefulWidget {
 
 class _MetasPageState extends State<MetasPage> {
   final ApiService _api = ApiService();
+
   final TextEditingController _tituloController = TextEditingController();
   final TextEditingController _valorMetaController = TextEditingController();
 
   List<Map<String, dynamic>> metas = [];
   List<bool> expandido = [];
+
   bool _carregando = true;
+
+  // ===============================
+  // SUPPORT
+  // ===============================
 
   double _getDoubleFromFormatted(String value) {
     final clean = value.replaceAll(RegExp(r'[^\d]'), '');
@@ -74,6 +80,7 @@ class _MetasPageState extends State<MetasPage> {
   Future<void> _carregarMetas() async {
     try {
       final resposta = await _api.getMetas(widget.token);
+
       setState(() {
         metas = List<Map<String, dynamic>>.from(resposta.map((m) => {
           'id': m['id'],
@@ -81,8 +88,10 @@ class _MetasPageState extends State<MetasPage> {
           'valor_metas': (m['valor_metas'] ?? 0).toDouble(),
           'depositado_metas': (m['depositado_metas'] ?? 0).toDouble(),
           'cor': m['cor'] ?? '#777777',
+          'eventos': <Map<String, dynamic>>[],
         }));
-        expandido = List.filled(metas.length, false);
+
+        expandido = List<bool>.filled(metas.length, false);
         _carregando = false;
       });
     } catch (e) {
@@ -90,6 +99,23 @@ class _MetasPageState extends State<MetasPage> {
       setState(() => _carregando = false);
     }
   }
+
+  Future<void> _carregarEventos(int index) async {
+    try {
+      final id = metas[index]['id'];
+      final eventos = await _api.getEventosMeta(widget.token, id);
+
+      setState(() {
+        metas[index]['eventos'] = List<Map<String, dynamic>>.from(eventos);
+      });
+    } catch (e) {
+      debugPrint("Erro ao carregar eventos da meta: $e");
+    }
+  }
+
+  // ===============================
+  // CRUD
+  // ===============================
 
   Future<void> _salvarMeta({int? index}) async {
     final titulo = _tituloController.text.trim();
@@ -138,11 +164,13 @@ class _MetasPageState extends State<MetasPage> {
             children: [
               TextField(
                 controller: _tituloController,
-                decoration: const InputDecoration(labelText: 'Título da Meta'),
+                decoration:
+                const InputDecoration(labelText: 'Título da Meta'),
               ),
               TextField(
                 controller: _valorMetaController,
-                decoration: const InputDecoration(labelText: 'Valor da Meta'),
+                decoration:
+                const InputDecoration(labelText: 'Valor da Meta'),
                 keyboardType: TextInputType.number,
                 inputFormatters: [CurrencyTextInputFormatter()],
               ),
@@ -151,15 +179,15 @@ class _MetasPageState extends State<MetasPage> {
         ),
         actions: [
           TextButton(
-            child: const Text('Cancelar'),
             onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
           ),
           ElevatedButton(
-            child: const Text('Salvar'),
             onPressed: () async {
               await _salvarMeta(index: index);
               if (context.mounted) Navigator.pop(context);
             },
+            child: const Text('Salvar'),
           ),
         ],
       ),
@@ -170,8 +198,8 @@ class _MetasPageState extends State<MetasPage> {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Confirmar Exclusão'),
-        content: const Text('Deseja realmente excluir esta meta?'),
+        title: const Text('Excluir Meta'),
+        content: const Text('Tem certeza que deseja excluir esta meta?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -193,6 +221,10 @@ class _MetasPageState extends State<MetasPage> {
       ),
     );
   }
+
+  // ===============================
+  // Movimentações
+  // ===============================
 
   void _mostrarDialogValor(int index, {required bool adicionar}) {
     final controller = TextEditingController();
@@ -216,22 +248,23 @@ class _MetasPageState extends State<MetasPage> {
             child: const Text('Confirmar'),
             onPressed: () async {
               final valor = _getDoubleFromFormatted(controller.text);
-              final meta = metas[index];
+              if (valor <= 0) return;
 
-              final novoValor = adicionar
-                  ? meta['depositado_metas'] + valor
-                  : (meta['depositado_metas'] - valor)
-                  .clamp(0.0, meta['valor_metas']);
+              final metaId = metas[index]['id'];
 
-              final dados = {
-                'titulo_metas': meta['titulo_metas'],
-                'valor_metas': meta['valor_metas'],
-                'depositado_metas': novoValor,
-                'usuario_id': widget.usuarioId,
-              };
+              try {
+                if (adicionar) {
+                  await _api.aportarMeta(widget.token, metaId, valor);
+                } else {
+                  await _api.retirarMeta(widget.token, metaId, valor);
+                }
 
-              await _api.atualizarMeta(widget.token, meta['id'], dados);
-              await _carregarMetas();
+                await _carregarMetas();
+                await _carregarEventos(index);
+              } catch (e) {
+                debugPrint("Erro ao movimentar meta: $e");
+              }
+
               if (context.mounted) Navigator.pop(context);
             },
           ),
@@ -240,6 +273,10 @@ class _MetasPageState extends State<MetasPage> {
     );
   }
 
+  // ===============================
+  // GRÁFICO COMPARATIVO
+  // ===============================
+
   Widget _construirGraficoComparativoMetas() {
     if (metas.isEmpty) return const SizedBox.shrink();
 
@@ -247,70 +284,234 @@ class _MetasPageState extends State<MetasPage> {
         .map((e) => (e['valor_metas'] ?? 0).toDouble())
         .fold<double>(0, (a, b) => a > b ? a : b);
 
-    return AspectRatio(
-      aspectRatio: 1.4,
-      child: BarChart(
-        BarChartData(
-          alignment: BarChartAlignment.spaceAround,
-          maxY: maxMeta * 1.2,
-          barTouchData: BarTouchData(enabled: true),
-          titlesData: FlTitlesData(
-            leftTitles: AxisTitles(
-              sideTitles: SideTitles(showTitles: true, reservedSize: 40),
-            ),
-            bottomTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                getTitlesWidget: (value, meta) {
-                  final index = value.toInt();
-                  if (index >= 0 && index < metas.length) {
-                    return SideTitleWidget(
-                      axisSide: meta.axisSide,
-                      child: Text(
-                        metas[index]['titulo_metas'].toString(),
-                        style: const TextStyle(fontSize: 10),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    );
-                  }
-                  return const SizedBox.shrink();
-                },
-              ),
-            ),
-            topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          ),
-          gridData: FlGridData(show: false),
-          borderData: FlBorderData(show: false),
-          barGroups: List.generate(metas.length, (index) {
+    return SizedBox(
+      height: 260,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: List.generate(metas.length, (index) {
             final meta = metas[index];
             final valor = (meta['valor_metas'] ?? 0).toDouble();
             final depositado = (meta['depositado_metas'] ?? 0).toDouble();
             final progresso =
             valor > 0 ? (depositado / valor).clamp(0.0, 1.0) : 0.0;
 
-            return BarChartGroupData(
-              x: index,
-              barRods: [
-                BarChartRodData(
-                  toY: valor.isFinite ? valor : 0,
-                  width: 40,
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                BarChartRodData(
-                  toY: depositado.isFinite ? depositado : 0,
-                  width: 40,
-                  color: _corProgresso(progresso),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ],
+            return SizedBox(
+              width: 120,
+              child: Column(
+                children: [
+                  Expanded(
+                    child: BarChart(
+                      BarChartData(
+                        maxY: maxMeta * 1.2,
+                        barGroups: [
+                          BarChartGroupData(
+                            x: index,
+                            barRods: [
+                              BarChartRodData(
+                                toY: valor,
+                                color: Colors.grey[300],
+                                width: 26,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              BarChartRodData(
+                                toY: depositado,
+                                color: _corProgresso(progresso),
+                                width: 26,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                            ],
+                          ),
+                        ],
+                        titlesData: const FlTitlesData(
+                          leftTitles: AxisTitles(),
+                          rightTitles: AxisTitles(),
+                          topTitles: AxisTitles(),
+                        ),
+                        borderData: FlBorderData(show: false),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    meta['titulo_metas'],
+                    textAlign: TextAlign.center,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 11),
+                  )
+                ],
+              ),
             );
           }),
         ),
       ),
     );
   }
+
+  // ===============================
+  // CARD DA META
+  // ===============================
+
+  Widget _buildMetaCard(int index) {
+    final meta = metas[index];
+
+    final progresso = ((meta['depositado_metas'] ?? 0.0) /
+        (meta['valor_metas'] ?? 1))
+        .clamp(0.0, 1.0);
+
+    return GestureDetector(
+      onTap: () async {
+        setState(() => expandido[index] = !expandido[index]);
+        if (expandido[index]) {
+          await _carregarEventos(index);
+        }
+      },
+      child: Card(
+        elevation: 3,
+        margin: const EdgeInsets.symmetric(vertical: 10),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              /// Cabeçalho
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    meta['titulo_metas'],
+                    style: const TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  PopupMenuButton<String>(
+                    onSelected: (value) {
+                      if (value == 'Editar') {
+                        _abrirFormularioNovaMeta(index: index);
+                      } else if (value == 'Excluir') {
+                        _removerMeta(index);
+                      }
+                    },
+                    itemBuilder: (_) => const [
+                      PopupMenuItem(
+                        value: 'Editar',
+                        child: Text('Editar'),
+                      ),
+                      PopupMenuItem(
+                        value: 'Excluir',
+                        child: Text('Excluir'),
+                      ),
+                    ],
+                  )
+                ],
+              ),
+
+              const SizedBox(height: 8),
+
+              /// Depositado + Total
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    "Depositado: R\$ ${meta['depositado_metas'].toStringAsFixed(2)}",
+                    style: const TextStyle(
+                        color: Colors.green,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13),
+                  ),
+                  Text(
+                    "Total: R\$ ${meta['valor_metas'].toStringAsFixed(2)}",
+                    style: const TextStyle(
+                        color: Colors.black87,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 10),
+
+              /// Barra de progresso
+              LinearProgressIndicator(
+                value: progresso,
+                minHeight: 10,
+                backgroundColor: Colors.grey[300],
+                valueColor:
+                AlwaysStoppedAnimation<Color>(_corProgresso(progresso)),
+              ),
+              const SizedBox(height: 6),
+              Text("${(progresso * 100).toStringAsFixed(0)}% concluído"),
+
+              /// Movimentações
+              if (expandido[index]) ...[
+                const SizedBox(height: 16),
+                const Text(
+                  "Movimentações:",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 10),
+
+                if ((meta['eventos'] ?? []).isEmpty)
+                  const Text("Nenhuma movimentação ainda."),
+
+                ...List.generate(meta['eventos'].length, (eIndex) {
+                  final e = meta['eventos'][eIndex];
+                  final delta = e['delta_valor'];
+                  final data = DateFormat("dd/MM/yyyy HH:mm")
+                      .format(DateTime.parse(e['criado_em']));
+
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          delta > 0 ? "Aporte" : "Retirada",
+                          style: TextStyle(
+                            color: delta > 0 ? Colors.green : Colors.red,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          "${delta > 0 ? '+' : ''} R\$ ${delta.toStringAsFixed(2)}",
+                          style: TextStyle(
+                              color: delta > 0 ? Colors.green : Colors.red),
+                        ),
+                        Text(data),
+                      ],
+                    ),
+                  );
+                }),
+
+                const SizedBox(height: 16),
+
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    ElevatedButton(
+                      onPressed: () =>
+                          _mostrarDialogValor(index, adicionar: true),
+                      child: const Text("Adicionar"),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      onPressed: () =>
+                          _mostrarDialogValor(index, adicionar: false),
+                      child: const Text("Retirar"),
+                    ),
+                  ],
+                ),
+              ]
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ===============================
+  // BUILD
+  // ===============================
 
   @override
   Widget build(BuildContext context) {
@@ -322,150 +523,23 @@ class _MetasPageState extends State<MetasPage> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF2F4F8),
-      appBar: AppBar(
-        title: const Text('Minhas Metas'),
-        backgroundColor: const Color(0xFF006155),
-      ),
+
       floatingActionButton: FloatingActionButton(
         onPressed: () => _abrirFormularioNovaMeta(),
         backgroundColor: const Color(0xFF006155),
         child: const Icon(Icons.add),
       ),
+
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: metas.isEmpty
-            ? const Center(child: Text('Nenhuma meta adicionada ainda.'))
-            : Column(
+            ? const Center(child: Text("Nenhuma meta adicionada ainda."))
+            : ListView(
+          padding: const EdgeInsets.only(bottom: 100),
           children: [
             _construirGraficoComparativoMetas(),
             const SizedBox(height: 20),
-            Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.only(bottom: 80),
-                itemCount: metas.length,
-                itemBuilder: (context, index) {
-                  final meta = metas[index];
-                  final progresso = ((meta['depositado_metas'] ?? 0.0) /
-                      (meta['valor_metas'] ?? 1))
-                      .clamp(0.0, 1.0);
-
-                  return GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        expandido[index] = !expandido[index];
-                      });
-                    },
-                    child: Card(
-                      elevation: 3,
-                      margin: const EdgeInsets.symmetric(vertical: 10),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment:
-                              MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  meta['titulo_metas'],
-                                  style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold),
-                                ),
-                                PopupMenuButton<String>(
-                                  onSelected: (String result) {
-                                    if (result == 'Editar') {
-                                      _abrirFormularioNovaMeta(
-                                          index: index);
-                                    } else if (result == 'Excluir') {
-                                      _removerMeta(index);
-                                    }
-                                  },
-                                  itemBuilder:
-                                      (BuildContext context) => const <
-                                      PopupMenuEntry<String>>[
-                                    PopupMenuItem<String>(
-                                      value: 'Editar',
-                                      child: Text('Editar'),
-                                    ),
-                                    PopupMenuItem<String>(
-                                      value: 'Excluir',
-                                      child: Text('Excluir'),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            LinearProgressIndicator(
-                              value: progresso,
-                              minHeight: 10,
-                              backgroundColor: Colors.grey[300],
-                              valueColor:
-                              AlwaysStoppedAnimation<Color>(
-                                  _corProgresso(progresso)),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                                '${(progresso * 100).toStringAsFixed(0)}% concluído'),
-                            if (expandido[index]) ...[
-                              const SizedBox(height: 16),
-                              Row(
-                                mainAxisAlignment:
-                                MainAxisAlignment.spaceBetween,
-                                children: [
-                                  const Text('Valor da Meta:'),
-                                  Text(NumberFormat.simpleCurrency(
-                                      locale: 'pt_BR')
-                                      .format(
-                                      meta['valor_metas'] ?? 0.0)),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                mainAxisAlignment:
-                                MainAxisAlignment.spaceBetween,
-                                children: [
-                                  const Text('Já depositado:'),
-                                  Text(NumberFormat.simpleCurrency(
-                                      locale: 'pt_BR')
-                                      .format(meta[
-                                  'depositado_metas'] ??
-                                      0.0)),
-                                ],
-                              ),
-                              const SizedBox(height: 16),
-                              Row(
-                                mainAxisAlignment:
-                                MainAxisAlignment.end,
-                                children: [
-                                  ElevatedButton(
-                                    onPressed: () =>
-                                        _mostrarDialogValor(index,
-                                            adicionar: true),
-                                    child: const Text('Adicionar'),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  ElevatedButton(
-                                    onPressed: () =>
-                                        _mostrarDialogValor(index,
-                                            adicionar: false),
-                                    child: const Text('Retirar'),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
+            ...List.generate(metas.length, _buildMetaCard),
           ],
         ),
       ),

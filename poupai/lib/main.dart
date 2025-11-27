@@ -18,7 +18,7 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
-        fontFamily: 'Millaris',
+        fontFamily: 'Poppins',
         scaffoldBackgroundColor: const Color(0xFFF2F4F8),
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFF006155),

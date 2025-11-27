@@ -11,48 +11,55 @@ class ApiService {
   // =============================================
   // 🔗 CONFIGURAÇÃO BÁSICA DO CLIENTE DIO
   // =============================================
-  final String baseUrl = "http://127.0.0.1:8000"; // Emulador Android (localhost)
+  final String baseUrl = "http://192.168.18.7:8000";
+
   final Dio _dio = Dio(
     BaseOptions(
-      baseUrl: "http://127.0.0.1:8000",
-      connectTimeout: const Duration(seconds: 15),
-      receiveTimeout: const Duration(seconds: 30),
-      headers: {
-        "Content-Type": "application/json",
-      },
+      baseUrl: "http://192.168.18.7:8000",
+      connectTimeout: Duration(seconds: 15),
+      receiveTimeout: Duration(seconds: 30),
+      headers: {"Content-Type": "application/json"},
     ),
   );
 
-  Future<dynamic> get(String endpoint, {Map<String, dynamic>? query, String? token}) async {
+  // ======================================================
+  // MÉTODOS GENÉRICOS
+  // ======================================================
+
+  Future<dynamic> get(String endpoint,
+      {Map<String, dynamic>? query, String? token}) async {
     try {
       final response = await _dio.get(
         endpoint,
         queryParameters: query,
         options: Options(headers: {"Authorization": "Bearer $token"}),
       );
-      return response.data; // ✅ devolve só o corpo (JSON)
+      return response.data;
     } on DioException catch (e) {
       print("❌ Erro GET $endpoint: ${e.response?.data ?? e.message}");
       rethrow;
     }
   }
 
-  Future<dynamic> put(String endpoint, Map<String, dynamic> data, {String? token}) async {
+  Future<dynamic> put(String endpoint, Map<String, dynamic> data,
+      {String? token}) async {
     try {
       final response = await _dio.put(
         endpoint,
         data: data,
         options: Options(headers: {"Authorization": "Bearer $token"}),
       );
-      return response.data; // ✅ devolve só o corpo (JSON)
+      return response.data;
     } on DioException catch (e) {
       print("❌ Erro PUT $endpoint: ${e.response?.data ?? e.message}");
       rethrow;
     }
   }
+
   // ======================================================
-  // 👤 CONTA - ALTERAR SENHA / EXCLUIR
+  // 👤 CONTA
   // ======================================================
+
   Future<void> alterarSenha(String token, String novaSenha) async {
     try {
       await _dio.put(
@@ -79,6 +86,7 @@ class ApiService {
   // ======================================================
   // 🧾 CATEGORIAS
   // ======================================================
+
   Future<List<dynamic>> getCategorias(String token) async {
     try {
       final response = await _dio.get(
@@ -134,15 +142,12 @@ class ApiService {
   // 💰 TRANSAÇÕES
   // ======================================================
 
-  /// 📋 Lista transações filtradas por ano/mês
   Future<List<dynamic>> getTransacoes(String token, int ano, int mes) async {
     final url = Uri.parse('$baseUrl/v1/transacoes?ano=$ano&mes=$mes');
+
     final response = await http.get(
       url,
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
+      headers: {'Authorization': 'Bearer $token', 'Content-Type': 'application/json'},
     );
 
     if (response.statusCode == 200) {
@@ -153,21 +158,12 @@ class ApiService {
     }
   }
 
-  /// ➕ Cria nova transação
   Future<void> criarTransacao(String token, Map<String, dynamic> transacao) async {
     try {
-      final dados = Map<String, dynamic>.from(transacao);
-      if (!dados.containsKey("nome")) {
-        dados["nome"] = transacao["nome"] ?? "";
-      }
-
       await _dio.post(
         "/v1/transacoes",
-        data: dados,
-        options: Options(headers: {
-          "Authorization": "Bearer $token",
-          "Content-Type": "application/json",
-        }),
+        data: transacao,
+        options: Options(headers: {"Authorization": "Bearer $token"}),
       );
     } on DioException catch (e) {
       print("❌ Erro ao criar transação: ${e.response?.data ?? e.message}");
@@ -175,23 +171,11 @@ class ApiService {
     }
   }
 
-  /// ✏️ Atualiza transação existente
-  Future<void> atualizarTransacao(
-      String token,
-      int id,
-      Map<String, dynamic> transacao,
-      ) async {
+  Future<void> atualizarTransacao(String token, int id, Map<String, dynamic> transacao) async {
     try {
-      final dados = Map<String, dynamic>.from(transacao);
-
-      // ✅ Garante que o nome está presente (mesmo que em branco)
-      if (!dados.containsKey("nome")) {
-        dados["nome"] = transacao["nome"] ?? "";
-      }
-
       await _dio.put(
         "/v1/transacoes/$id",
-        data: dados,
+        data: transacao,
         options: Options(headers: {"Authorization": "Bearer $token"}),
       );
     } on DioException catch (e) {
@@ -200,7 +184,6 @@ class ApiService {
     }
   }
 
-  /// ❌ Exclui transação pelo ID
   Future<void> excluirTransacao(String token, int id) async {
     try {
       await _dio.delete(
@@ -216,6 +199,7 @@ class ApiService {
   // ======================================================
   // 🎯 METAS
   // ======================================================
+
   Future<List<dynamic>> getMetas(String token) async {
     try {
       final response = await _dio.get(
@@ -267,20 +251,63 @@ class ApiService {
     }
   }
 
+  // ================================
+  // 📌 NOVO — CRIA EVENTOS DE META
+  // ================================
+
+  Future<void> aportarMeta(String token, int metaId, double valor) async {
+    try {
+      await _dio.post(
+        "/v1/metas/$metaId/aportar",
+        data: {"valor": valor},
+        options: Options(headers: {"Authorization": "Bearer $token"}),
+      );
+    } on DioException catch (e) {
+      print("❌ Erro ao aportar meta: ${e.response?.data ?? e.message}");
+      rethrow;
+    }
+  }
+
+  Future<void> retirarMeta(String token, int metaId, double valor) async {
+    try {
+      await _dio.post(
+        "/v1/metas/$metaId/retirar",
+        data: {"valor": valor},
+        options: Options(headers: {"Authorization": "Bearer $token"}),
+      );
+    } on DioException catch (e) {
+      print("❌ Erro ao retirar meta: ${e.response?.data ?? e.message}");
+      rethrow;
+    }
+  }
+
+  /// 📜 Lista todos os eventos da meta
+  Future<List<Map<String, dynamic>>> getEventosMeta(String token, int metaId) async {
+    try {
+      final response = await _dio.get(
+        "/v1/metas/$metaId/eventos",
+        options: Options(headers: {"Authorization": "Bearer $token"}),
+      );
+      return List<Map<String, dynamic>>.from(response.data);
+    } on DioException catch (e) {
+      print("❌ Erro ao buscar eventos da meta $metaId: ${e.response?.data ?? e.message}");
+      rethrow;
+    }
+  }
+
   // ======================================================
   // 📊 ANALYTICS
   // ======================================================
 
-  Future<void> exportarPdf(String token, {required int ano, required int mes, required BuildContext context}) async {
+  Future<void> exportarPdf(String token,
+      {required int ano, required int mes, required BuildContext context}) async {
     try {
-      // 1️⃣ Tenta pedir permissão de armazenamento
-      if (await Permission.manageExternalStorage.isGranted == false &&
-          await Permission.storage.isGranted == false) {
+      if (!await Permission.manageExternalStorage.isGranted &&
+          !await Permission.storage.isGranted) {
         await Permission.manageExternalStorage.request();
         await Permission.storage.request();
       }
 
-      // 2️⃣ Chama a API
       final response = await http.get(
         Uri.parse('$baseUrl/v1/analytics/exportar_pdf?ano=$ano&mes=$mes'),
         headers: {'Authorization': 'Bearer $token'},
@@ -290,25 +317,8 @@ class ApiService {
         throw Exception('Erro ao gerar PDF: ${response.statusCode}');
       }
 
-      // 3️⃣ Obtém o diretório de downloads público (compatível com Android 11+)
-      final Directory? downloadsDir = await getDownloadsDirectory();
-      Directory dir;
-
-      if (downloadsDir != null) {
-        dir = downloadsDir;
-      } else {
-        // fallback: monta o caminho manualmente
-        final Directory extDir = await getExternalStorageDirectory() ?? await getApplicationDocumentsDirectory();
-        String newPath = "";
-        final paths = extDir.path.split("/");
-        for (int i = 1; i < paths.length; i++) {
-          final folder = paths[i];
-          if (folder == "Android") break;
-          newPath += "/$folder";
-        }
-        newPath = "$newPath/Download";
-        dir = Directory(newPath);
-      }
+      final downloadsDir = await getDownloadsDirectory();
+      Directory dir = downloadsDir ?? await getApplicationDocumentsDirectory();
 
       if (!await dir.exists()) {
         await dir.create(recursive: true);
@@ -318,12 +328,10 @@ class ApiService {
       final file = File(filePath);
       await file.writeAsBytes(response.bodyBytes);
 
-      // 4️⃣ Mensagem de sucesso
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('✅ PDF salvo em ${dir.path}')),
+        SnackBar(content: Text('📄 PDF salvo em ${dir.path}')),
       );
 
-      // 5️⃣ Tenta abrir o arquivo automaticamente
       await OpenFilex.open(file.path);
     } catch (e) {
       print('❌ Erro ao exportar PDF: $e');
@@ -360,12 +368,13 @@ class ApiService {
     }
   }
 
-  // ======================================================
-  // 🤖 INTELIGÊNCIA ARTIFICIAL
-  // ======================================================
-  Future<String> enviarMensagemIA(String token, String mensagem, {int? ano, int? mes}) async {
+// IA
+//======================================================
+
+  Future<String> enviarMensagemIA(String token, String mensagem,
+      {int? ano, int? mes}) async {
     try {
-      // monta o corpo da requisição dinamicamente
+      // 👇 aqui estava o erro: precisava tipar como Map<String, dynamic>
       final Map<String, dynamic> data = {"mensagem": mensagem};
       if (ano != null) data["ano"] = ano;
       if (mes != null) data["mes"] = mes;
@@ -378,7 +387,8 @@ class ApiService {
         ),
       );
 
-      if (response.statusCode == 200 && response.data["resposta"] != null) {
+      if (response.statusCode == 200 &&
+          response.data["resposta"] != null) {
         return response.data["resposta"];
       } else {
         throw Exception("Resposta inválida da IA: ${response.data}");
@@ -389,22 +399,20 @@ class ApiService {
     }
   }
 
-// ======================================================
-// 👤 AUTENTICAÇÃO
-// ======================================================
+  // ======================================================
+  // 🔐 AUTENTICAÇÃO
+  // ======================================================
+
   Future<bool> cadastrarUsuario(String email, String senha, {String? nome}) async {
     try {
       final response = await _dio.post(
         "/auth/register",
-        data: {
-          "email": email,
-          "password": senha,
-          "nome": nome ?? "Usuário"
-        },
+        data: {"email": email, "password": senha, "nome": nome ?? "Usuário"},
       );
       return response.statusCode == 200 || response.statusCode == 201;
     } on DioException catch (e) {
       print("❌ Erro API cadastrarUsuario: ${e.response?.data ?? e.message}");
-      return false;}
+      return false;
+    }
   }
 }

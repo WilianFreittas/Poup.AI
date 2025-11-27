@@ -25,7 +25,6 @@ class _ConfiguracoesAppPageState extends State<ConfiguracoesAppPage> {
   Future<void> _carregarPreferencias() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      modoEscuro = prefs.getBool('modoEscuro') ?? false;
       notificacoesAtivas = prefs.getBool('notificacoesAtivas') ?? true;
       idioma = prefs.getString('idioma') ?? "Português";
     });
