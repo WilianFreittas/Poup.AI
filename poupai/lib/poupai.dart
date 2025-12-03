@@ -130,7 +130,6 @@ class _PoupaiPageState extends State<PoupaiPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Assistente Poup.ai')),
       body: Column(
         children: [
           Expanded(

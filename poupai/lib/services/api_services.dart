@@ -8,51 +8,59 @@ import 'package:flutter/material.dart';
 import 'package:open_filex/open_filex.dart';
 
 class ApiService {
-  // =============================================
-  // 🔗 CONFIGURAÇÃO BÁSICA DO CLIENTE DIO
-  // =============================================
-  final String baseUrl = "http://10.0.2.2:8000"; // Emulador Android (localhost)
+  final String baseUrl = "http://10.0.2.2:8000";
+
   final Dio _dio = Dio(
     BaseOptions(
       baseUrl: "http://10.0.2.2:8000",
-      connectTimeout: const Duration(seconds: 30),
-      receiveTimeout: const Duration(seconds: 60),
-      headers: {
-        "Content-Type": "application/json",
-      },
+      connectTimeout: Duration(seconds: 15),
+      receiveTimeout: Duration(seconds: 30),
+      headers: {"Content-Type": "application/json"},
     ),
   );
 
-  Future<dynamic> get(String endpoint, {Map<String, dynamic>? query, String? token}) async {
+  // ======================================================
+  // 🔧 MÉTODOS GENÉRICOS (GET / PUT)
+  // ======================================================
+
+  Future<dynamic> get(String endpoint,
+      {Map<String, dynamic>? query, String? token}) async {
     try {
       final response = await _dio.get(
         endpoint,
         queryParameters: query,
-        options: Options(headers: {"Authorization": "Bearer $token"}),
+        options: Options(
+          headers: {"Authorization": "Bearer $token"},
+        ),
       );
-      return response.data; // ✅ devolve só o corpo (JSON)
+      return response.data;
     } on DioException catch (e) {
-      print("❌ Erro GET $endpoint: ${e.response?.data ?? e.message}");
+      print("❌ GET $endpoint: ${e.response?.data ?? e.message}");
       rethrow;
     }
   }
 
-  Future<dynamic> put(String endpoint, Map<String, dynamic> data, {String? token}) async {
+  Future<dynamic> put(String endpoint, Map<String, dynamic> data,
+      {String? token}) async {
     try {
       final response = await _dio.put(
         endpoint,
         data: data,
-        options: Options(headers: {"Authorization": "Bearer $token"}),
+        options: Options(
+          headers: {"Authorization": "Bearer $token"},
+        ),
       );
-      return response.data; // ✅ devolve só o corpo (JSON)
+      return response.data;
     } on DioException catch (e) {
-      print("❌ Erro PUT $endpoint: ${e.response?.data ?? e.message}");
+      print("❌ PUT $endpoint: ${e.response?.data ?? e.message}");
       rethrow;
     }
   }
+
   // ======================================================
-  // 👤 CONTA - ALTERAR SENHA / EXCLUIR
+  // 👤 CONTA
   // ======================================================
+
   Future<void> alterarSenha(String token, String novaSenha) async {
     try {
       await _dio.put(
@@ -79,6 +87,7 @@ class ApiService {
   // ======================================================
   // 🧾 CATEGORIAS
   // ======================================================
+
   Future<List<dynamic>> getCategorias(String token) async {
     try {
       final response = await _dio.get(
@@ -87,7 +96,7 @@ class ApiService {
       );
       return response.data;
     } on DioException catch (e) {
-      print("❌ Erro ao buscar categorias: ${e.response?.data ?? e.message}");
+      print("❌ Erro categorias: ${e.response?.data}");
       rethrow;
     }
   }
@@ -96,24 +105,35 @@ class ApiService {
     try {
       await _dio.post(
         "/v1/categorias",
-        data: categoria,
+        data: {
+          "cat_nome": categoria["cat_nome"],
+          "cat_tipo": categoria["cat_tipo"],
+          "cat_cor": categoria["cat_cor"],
+          "cat_icone": categoria["cat_icone"],
+        },
         options: Options(headers: {"Authorization": "Bearer $token"}),
       );
     } on DioException catch (e) {
-      print("❌ Erro ao criar categoria: ${e.response?.data ?? e.message}");
+      print("❌ Criar categoria: ${e.response?.data}");
       rethrow;
     }
   }
 
-  Future<void> atualizarCategoria(String token, int categoriaId, Map<String, dynamic> payload) async {
+  Future<void> atualizarCategoria(
+      String token, int catId, Map<String, dynamic> categoria) async {
     try {
       await _dio.put(
-        "/v1/categorias/$categoriaId",
-        data: payload,
+        "/v1/categorias/$catId",
+        data: {
+          "cat_nome": categoria["cat_nome"],
+          "cat_tipo": categoria["cat_tipo"],
+          "cat_cor": categoria["cat_cor"],
+          "cat_icone": categoria["cat_icone"],
+        },
         options: Options(headers: {"Authorization": "Bearer $token"}),
       );
     } on DioException catch (e) {
-      print("❌ Erro ao atualizar categoria: ${e.response?.data ?? e.message}");
+      print("❌ Atualizar categoria: ${e.response?.data}");
       rethrow;
     }
   }
@@ -125,7 +145,7 @@ class ApiService {
         options: Options(headers: {"Authorization": "Bearer $token"}),
       );
     } on DioException catch (e) {
-      print("❌ Erro ao excluir categoria: ${e.response?.data ?? e.message}");
+      print("❌ Excluir categoria: ${e.response?.data}");
       rethrow;
     }
   }
@@ -134,73 +154,60 @@ class ApiService {
   // 💰 TRANSAÇÕES
   // ======================================================
 
-  /// 📋 Lista transações filtradas por ano/mês
   Future<List<dynamic>> getTransacoes(String token, int ano, int mes) async {
-    final url = Uri.parse('$baseUrl/v1/transacoes?ano=$ano&mes=$mes');
-    final response = await http.get(
-      url,
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
-    );
-
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
-    } else {
-      print('❌ Erro ao carregar transações: ${response.body}');
-      throw Exception('Erro ao buscar transações (${response.statusCode})');
-    }
-  }
-
-  /// ➕ Cria nova transação
-  Future<void> criarTransacao(String token, Map<String, dynamic> transacao) async {
     try {
-      final dados = Map<String, dynamic>.from(transacao);
-      if (!dados.containsKey("nome")) {
-        dados["nome"] = transacao["nome"] ?? "";
-      }
-
-      await _dio.post(
+      final response = await _dio.get(
         "/v1/transacoes",
-        data: dados,
-        options: Options(headers: {
-          "Authorization": "Bearer $token",
-          "Content-Type": "application/json",
-        }),
+        queryParameters: {"ano": ano, "mes": mes},
+        options: Options(headers: {"Authorization": "Bearer $token"}),
       );
+
+      return response.data;
     } on DioException catch (e) {
-      print("❌ Erro ao criar transação: ${e.response?.data ?? e.message}");
+      print("❌ GET transações: ${e.response?.data}");
       rethrow;
     }
   }
 
-  /// ✏️ Atualiza transação existente
-  Future<void> atualizarTransacao(
-      String token,
-      int id,
-      Map<String, dynamic> transacao,
-      ) async {
+  Future<void> criarTransacao(String token, Map<String, dynamic> t) async {
     try {
-      final dados = Map<String, dynamic>.from(transacao);
-
-      // ✅ Garante que o nome está presente (mesmo que em branco)
-      if (!dados.containsKey("nome")) {
-        dados["nome"] = transacao["nome"] ?? "";
-      }
-
-      await _dio.put(
-        "/v1/transacoes/$id",
-        data: dados,
+      await _dio.post(
+        "/v1/transacoes",
+        data: {
+          "tra_tipo": t["tra_tipo"],
+          "tra_valor": t["tra_valor"],
+          "tra_data": t["tra_data"],
+          "tra_observacao": t["tra_observacao"],
+          "fk_categorias_cat_id": t["fk_categorias_cat_id"],
+        },
         options: Options(headers: {"Authorization": "Bearer $token"}),
       );
     } on DioException catch (e) {
-      print("❌ Erro ao atualizar transação: ${e.response?.data ?? e.message}");
+      print("❌ Criar transação: ${e.response?.data}");
       rethrow;
     }
   }
 
-  /// ❌ Exclui transação pelo ID
+  Future<void> atualizarTransacao(
+      String token, int id, Map<String, dynamic> t) async {
+    try {
+      await _dio.put(
+        "/v1/transacoes/$id",
+        data: {
+          "tra_tipo": t["tra_tipo"],
+          "tra_valor": t["tra_valor"],
+          "tra_data": t["tra_data"],
+          "tra_observacao": t["tra_observacao"],
+          "fk_categorias_cat_id": t["fk_categorias_cat_id"],
+        },
+        options: Options(headers: {"Authorization": "Bearer $token"}),
+      );
+    } on DioException catch (e) {
+      print("❌ Atualizar transação: ${e.response?.data}");
+      rethrow;
+    }
+  }
+
   Future<void> excluirTransacao(String token, int id) async {
     try {
       await _dio.delete(
@@ -208,14 +215,32 @@ class ApiService {
         options: Options(headers: {"Authorization": "Bearer $token"}),
       );
     } on DioException catch (e) {
-      print("❌ Erro ao excluir transação: ${e.response?.data ?? e.message}");
+      print("❌ Excluir transação: ${e.response?.data}");
       rethrow;
     }
   }
 
+  // ======================================================
+// 📜 EVENTOS DAS METAS
 // ======================================================
-// 🎯 METAS
-// ======================================================
+  Future<List<dynamic>> getEventosMeta(String token, int metaId) async {
+    try {
+      final response = await _dio.get(
+        "/v1/metas/$metaId/eventos",
+        options: Options(headers: {"Authorization": "Bearer $token"}),
+      );
+
+      return response.data;
+    } on DioException catch (e) {
+      print("❌ Erro ao buscar eventos da meta: ${e.response?.data}");
+      rethrow;
+    }
+  }
+
+  // ======================================================
+  // 🎯 METAS
+  // ======================================================
+
   Future<List<dynamic>> getMetas(String token) async {
     try {
       final response = await _dio.get(
@@ -224,33 +249,43 @@ class ApiService {
       );
       return response.data;
     } on DioException catch (e) {
-      print("❌ Erro ao buscar metas: ${e.response?.data ?? e.message}");
+      print("❌ GET metas: ${e.response?.data}");
       rethrow;
     }
   }
 
-  Future<void> criarMeta(String token, Map<String, dynamic> meta) async {
+  Future<void> criarMeta(String token, Map<String, dynamic> m) async {
     try {
       await _dio.post(
         "/v1/metas",
-        data: meta,
+        data: {
+          "met_titulo": m["met_titulo"],
+          "met_valor": m["met_valor"],
+          "met_depositado": m["met_depositado"] ?? 0.0,
+          "met_cor": m["met_cor"] ?? "#777777",
+        },
         options: Options(headers: {"Authorization": "Bearer $token"}),
       );
     } on DioException catch (e) {
-      print("❌ Erro ao criar meta: ${e.response?.data ?? e.message}");
+      print("❌ Criar meta: ${e.response?.data}");
       rethrow;
     }
   }
 
-  Future<void> atualizarMeta(String token, int id, Map<String, dynamic> meta) async {
+  Future<void> atualizarMeta(String token, int id, Map<String, dynamic> m) async {
     try {
       await _dio.put(
         "/v1/metas/$id",
-        data: meta,
+        data: {
+          "met_titulo": m["met_titulo"],
+          "met_valor": m["met_valor"],
+          "met_depositado": m["met_depositado"],
+          "met_cor": m["met_cor"],
+        },
         options: Options(headers: {"Authorization": "Bearer $token"}),
       );
     } on DioException catch (e) {
-      print("❌ Erro ao atualizar meta: ${e.response?.data ?? e.message}");
+      print("❌ Atualizar meta: ${e.response?.data}");
       rethrow;
     }
   }
@@ -262,126 +297,63 @@ class ApiService {
         options: Options(headers: {"Authorization": "Bearer $token"}),
       );
     } on DioException catch (e) {
-      print("❌ Erro ao excluir meta: ${e.response?.data ?? e.message}");
+      print("❌ Excluir meta: ${e.response?.data}");
       rethrow;
     }
   }
 
-// ======================================================
-// 💰 APORTAR META
-// ======================================================
-  Future<void> aportarMeta(String token, int metaId, double valor) async {
+  // ======================================================
+  // 💰 APORTAR META
+  // ======================================================
+  Future<Map<String, dynamic>> aportarMeta(
+      String token, int metaId, Map<String, dynamic> body) async {
     try {
       final response = await _dio.post(
         "/v1/metas/$metaId/aportar",
-        data: {'valor': valor},
-        options: Options(headers: {'Authorization': 'Bearer $token'}),
+        data: body,
+        options: Options(headers: {"Authorization": "Bearer $token"}),
       );
-      if (response.statusCode != 200) {
-        throw Exception('Erro ao aportar meta');
-      }
+
+      return response.data;
     } on DioException catch (e) {
-      print("❌ Erro ao aportar meta: ${e.response?.data ?? e.message}");
+      print("❌ Erro ao aportar meta: ${e.response?.data}");
       rethrow;
     }
   }
 
-// ======================================================
-// 💸 RETIRAR META
-// ======================================================
-  Future<void> retirarMeta(String token, int metaId, double valor) async {
+  // ======================================================
+  // 💸 RETIRAR META
+  // ======================================================
+  Future<Map<String, dynamic>> retirarMeta(
+      String token, int metaId, Map<String, dynamic> body) async {
     try {
       final response = await _dio.post(
         "/v1/metas/$metaId/retirar",
-        data: {'valor': valor},
-        options: Options(headers: {'Authorization': 'Bearer $token'}),
+        data: body,
+        options: Options(headers: {"Authorization": "Bearer $token"}),
       );
-      if (response.statusCode != 200) {
-        throw Exception('Erro ao retirar meta');
-      }
+
+      return response.data;
     } on DioException catch (e) {
-      print("❌ Erro ao retirar meta: ${e.response?.data ?? e.message}");
+      print("❌ Erro ao retirar meta: ${e.response?.data}");
       rethrow;
     }
   }
-
 
   // ======================================================
   // 📊 ANALYTICS
   // ======================================================
 
-  Future<void> exportarPdf(String token, {required int ano, required int mes, required BuildContext context}) async {
-    try {
-      // 1️⃣ Tenta pedir permissão de armazenamento
-      if (await Permission.manageExternalStorage.isGranted == false &&
-          await Permission.storage.isGranted == false) {
-        await Permission.manageExternalStorage.request();
-        await Permission.storage.request();
-      }
-
-      // 2️⃣ Chama a API
-      final response = await http.get(
-        Uri.parse('$baseUrl/v1/analytics/exportar_pdf?ano=$ano&mes=$mes'),
-        headers: {'Authorization': 'Bearer $token'},
-      );
-
-      if (response.statusCode != 200) {
-        throw Exception('Erro ao gerar PDF: ${response.statusCode}');
-      }
-
-      // 3️⃣ Obtém o diretório de downloads público (compatível com Android 11+)
-      final Directory? downloadsDir = await getDownloadsDirectory();
-      Directory dir;
-
-      if (downloadsDir != null) {
-        dir = downloadsDir;
-      } else {
-        // fallback: monta o caminho manualmente
-        final Directory extDir = await getExternalStorageDirectory() ?? await getApplicationDocumentsDirectory();
-        String newPath = "";
-        final paths = extDir.path.split("/");
-        for (int i = 1; i < paths.length; i++) {
-          final folder = paths[i];
-          if (folder == "Android") break;
-          newPath += "/$folder";
-        }
-        newPath = "$newPath/Download";
-        dir = Directory(newPath);
-      }
-
-      if (!await dir.exists()) {
-        await dir.create(recursive: true);
-      }
-
-      final filePath = '${dir.path}/extrato_${ano}_${mes}.pdf';
-      final file = File(filePath);
-      await file.writeAsBytes(response.bodyBytes);
-
-      // 4️⃣ Mensagem de sucesso
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('✅ PDF salvo em ${dir.path}')),
-      );
-
-      // 5️⃣ Tenta abrir o arquivo automaticamente
-      await OpenFilex.open(file.path);
-    } catch (e) {
-      print('❌ Erro ao exportar PDF: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('❌ Erro ao exportar PDF: $e')),
-      );
-    }
-  }
-
   Future<Map<String, dynamic>> getResumo(String token, int ano, int mes) async {
     try {
       final response = await _dio.get(
-        '/v1/analytics/resumo',
-        queryParameters: {'ano': ano, 'mes': mes},
-        options: Options(headers: {'Authorization': 'Bearer $token'}),
+        "/v1/analytics/resumo",
+        queryParameters: {"ano": ano, "mes": mes},
+        options: Options(headers: {"Authorization": "Bearer $token"}),
       );
       return response.data;
     } on DioException catch (e) {
-      print('❌ Erro ao obter resumo: ${e.response?.data}');
+      print("❌ Resumo analytics: ${e.response?.data}");
       rethrow;
     }
   }
@@ -394,43 +366,104 @@ class ApiService {
       );
       return response.data;
     } on DioException catch (e) {
-      print("❌ Erro ao exportar dados: ${e.response?.data ?? e.message}");
+      print("❌ Resumo completo: ${e.response?.data}");
       rethrow;
+    }
+  }
+
+  // Download do PDF
+  Future<void> exportarPdf(String token,
+      {required int ano,
+        required int mes,
+        required BuildContext context}) async {
+    try {
+      if (!await Permission.storage.isGranted) {
+        await Permission.storage.request();
+      }
+
+      final response = await http.get(
+        Uri.parse('$baseUrl/v1/analytics/exportar_pdf?ano=$ano&mes=$mes'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception("Erro ao gerar PDF");
+      }
+
+      final dir = await getDownloadsDirectory();
+      final path = "${dir!.path}/extrato_${ano}_${mes}.pdf";
+
+      final file = File(path);
+      await file.writeAsBytes(response.bodyBytes);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("✅ PDF salvo em $path")),
+      );
+
+      await OpenFilex.open(path);
+    } catch (e) {
+      print("❌ PDF erro: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("❌ Erro ao exportar PDF: $e")),
+      );
     }
   }
 
   // ======================================================
   // 🤖 INTELIGÊNCIA ARTIFICIAL
   // ======================================================
-  Future<String> enviarMensagemIA(String token, String mensagem, {int? ano, int? mes}) async {
+
+  Future<String> enviarMensagemIA(String token, String mensagem,
+      {int? ano, int? mes}) async {
     try {
-      // monta o corpo da requisição dinamicamente
-      final Map<String, dynamic> data = {"mensagem": mensagem};
-      if (ano != null) data["ano"] = ano;
-      if (mes != null) data["mes"] = mes;
+      final Map<String, dynamic> body = {"mensagem": mensagem};
+
+      if (ano != null) body["ano"] = ano;
+      if (mes != null) body["mes"] = mes;
 
       final response = await _dio.post(
         "/v1/ia/chat",
-        data: data,
-        options: Options(
-          headers: {"Authorization": "Bearer $token"},
-        ),
+        data: body,
+        options: Options(headers: {"Authorization": "Bearer $token"}),
       );
 
-      if (response.statusCode == 200 && response.data["resposta"] != null) {
-        return response.data["resposta"];
-      } else {
-        throw Exception("Resposta inválida da IA: ${response.data}");
-      }
+      return response.data["resposta"] ?? "Sem resposta";
     } on DioException catch (e) {
-      print("❌ Erro ao comunicar com IA: ${e.response?.data ?? e.message}");
+      print("❌ IA erro: ${e.response?.data}");
       rethrow;
     }
   }
 
-// ======================================================
-// 👤 AUTENTICAÇÃO
-// ======================================================
+  // ======================================================
+  // 🔐 AUTENTICAÇÃO
+  // ======================================================
+
+  Future<Map<String, dynamic>?> login(String email, String senha) async {
+    try {
+      final response = await _dio.post(
+        "/auth/login",
+        data: {
+          "email": email,
+          "password": senha,
+        },
+        options: Options(headers: {"Content-Type": "application/json"}),
+      );
+
+      if (response.statusCode == 200) {
+        // ✅ CORRIGIDO: retorna tanto token quanto user_id
+        return {
+          "access_token": response.data["access_token"],
+          "user_id": response.data["user_id"],
+        };
+      }
+
+      return null;
+    } on DioException catch (e) {
+      print("❌ Erro login: ${e.response?.data ?? e.message}");
+      return null;
+    }
+  }
+
   Future<bool> cadastrarUsuario(String email, String senha, {String? nome}) async {
     try {
       final response = await _dio.post(
@@ -438,12 +471,13 @@ class ApiService {
         data: {
           "email": email,
           "password": senha,
-          "nome": nome ?? "Usuário"
+          "nome": nome ?? "Usuário",
         },
       );
       return response.statusCode == 200 || response.statusCode == 201;
     } on DioException catch (e) {
-      print("❌ Erro API cadastrarUsuario: ${e.response?.data ?? e.message}");
-      return false;}
+      print("❌ Cadastro erro: ${e.response?.data}");
+      return false;
+    }
   }
 }

@@ -25,7 +25,7 @@ class _ConfiguracoesAppPageState extends State<ConfiguracoesAppPage> {
   Future<void> _carregarPreferencias() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      modoEscuro = prefs.getBool('modoEscuro') ?? false;
+      modoEscuro = prefs.getBool('modoEscuro') ?? false;     // ⬅️ ADICIONADO
       notificacoesAtivas = prefs.getBool('notificacoesAtivas') ?? true;
       idioma = prefs.getString('idioma') ?? "Português";
     });
@@ -44,28 +44,16 @@ class _ConfiguracoesAppPageState extends State<ConfiguracoesAppPage> {
   }
 
   // ======================================================
-  // 🌓 Alterna o modo escuro/claro
+  // 🌓 Alterna o modo escuro/claro (somente salva)
   // ======================================================
   void _alternarTema(bool value) async {
-    setState(() {
-      modoEscuro = value;
-    });
+    setState(() => modoEscuro = value);
     await _salvarPreferencia('modoEscuro', value);
 
-    final themeMode = value ? ThemeMode.dark : ThemeMode.light;
-    // Atualiza o tema globalmente (se o app usar ThemeMode)
-    // ignore: use_build_context_synchronously
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (_) => MaterialApp(
-          debugShowCheckedModeBanner: false,
-          themeMode: themeMode,
-          theme: ThemeData.light(),
-          darkTheme: ThemeData.dark(),
-          home: const ConfiguracoesAppPage(),
-        ),
-      ),
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(
+          value ? "🌙 Modo escuro ativado." : "☀️ Modo claro ativado."
+      )),
     );
   }
 

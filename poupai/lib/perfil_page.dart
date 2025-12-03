@@ -29,25 +29,17 @@ class _PerfilPageState extends State<PerfilPage> {
   }
 
   // ======================================================
-  // 🔹 CARREGA PERFIL DO BACKEND (Supabase + API)
+  // 🔹 CARREGA PERFIL SOMENTE VIA /auth/validate
   // ======================================================
   Future<void> _carregarPerfil() async {
     try {
-      // 1️⃣ Valida o token e pega o e-mail do Supabase
       final response = await _apiService.get(
         "/auth/validate",
         token: widget.token,
       );
 
       emailController.text = response['email'] ?? '';
-
-      // 2️⃣ Busca o nome e dados adicionais do usuário
-      final resUsuario = await _apiService.get(
-        "/v1/usuarios/${widget.usuarioId}",
-        token: widget.token,
-      );
-
-      nomeController.text = resUsuario['nome'] ?? '';
+      nomeController.text = response['nome'] ?? '';
 
       setState(() => isLoading = false);
     } catch (e) {
@@ -60,23 +52,22 @@ class _PerfilPageState extends State<PerfilPage> {
   }
 
   // ======================================================
-  // 💾 ATUALIZA PERFIL DO USUÁRIO
+  // 💾 ATUALIZA SOMENTE O NOME
   // ======================================================
   Future<void> _salvarAlteracoes() async {
     final nome = nomeController.text.trim();
-    final email = emailController.text.trim();
 
-    if (nome.isEmpty || email.isEmpty) {
+    if (nome.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Preencha todos os campos.")),
+        const SnackBar(content: Text("O nome não pode estar vazio.")),
       );
       return;
     }
 
     try {
       await _apiService.put(
-        "/v1/usuarios/${widget.usuarioId}",
-        {"nome": nome, "email": email},
+        "/v1/usuarios/atualizar_nome",
+        {"nome": nome},
         token: widget.token,
       );
 
@@ -109,7 +100,7 @@ class _PerfilPageState extends State<PerfilPage> {
             ),
             TextField(
               controller: emailController,
-              readOnly: true, // e-mail não editável (Supabase controla)
+              readOnly: true, // e-mail não pode ser alterado
               decoration: const InputDecoration(labelText: 'E-mail'),
             ),
             const SizedBox(height: 20),

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:dio/dio.dart'; // <– nova dependência
+import 'package:dio/dio.dart';
 import 'home_page.dart';
 import 'telacadastro.dart';
 
@@ -15,8 +15,7 @@ class _LoginState extends State<Login> {
   final passwordController = TextEditingController();
   bool isLoading = false;
 
-  // Endereço base da API
-  final String baseUrl = "http://10.0.2.2:8000";//'http://10.0.2.2:8000'; // ajuste conforme ambiente
+  final String baseUrl = "http://10.0.2.2:8000";
 
   Future<void> loginUsuario() async {
     final email = emailController.text.trim();
@@ -37,53 +36,58 @@ class _LoginState extends State<Login> {
       final response = await dio.post(
         '$baseUrl/auth/login',
         data: {
-          'email': email,
-          'password': senha,
+          "email": email,
+          "password": senha,
         },
-        options: Options(headers: {'Content-Type': 'application/json'}),
+        options: Options(headers: {"Content-Type": "application/json"}),
       );
 
       if (response.statusCode == 200) {
         final data = response.data;
 
-        // supondo que a API retorne algo como:
-        // { "usuario_id": "uuid", "token": "..." }
+        // ✅ CORRIGIDO: pega access_token e user_id corretamente
+        final token = data["access_token"] ?? "";
+        final usuarioId = data["user_id"] ?? "";
 
-        final usuarioId = data['user_id'];
-        final token = data['access_token'];
+        if (token.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Token inválido do servidor.")),
+          );
+          setState(() => isLoading = false);
+          return;
+        }
+
+        print("🔑 LOGIN OK");
+        print("🧾 TOKEN: $token");
+        print("👤 USER_ID: $usuarioId");
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Login realizado com sucesso!')),
+          const SnackBar(content: Text("Login realizado com sucesso!")),
         );
 
-        // Aqui você pode salvar o token localmente (para futuras requisições autenticadas)
-        // Exemplo com shared_preferences:
-        // final prefs = await SharedPreferences.getInstance();
-        // await prefs.setString('auth_token', token);
-        print("🧾 Token recebido: $token");
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
             builder: (context) => HomePage(
-              usuarioId: usuarioId,
-              token: token, // ✅ token JWT vindo da API
+              token: token,
+              usuarioId: usuarioId, // ✅ agora passa o user_id correto
             ),
           ),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Falha no login: ${response.statusMessage}')),
+          SnackBar(content: Text("Falha no login: ${response.statusMessage}")),
         );
       }
     } on DioException catch (e) {
-      final msg = e.response?.data?['detail'] ??
-          'Não foi possível conectar à API. Verifique o servidor.';
+      final msg = e.response?.data?["detail"] ??
+          "Não foi possível conectar ao servidor.";
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro: $msg')),
+        SnackBar(content: Text("Erro: $msg")),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro inesperado: $e')),
+        SnackBar(content: Text("Erro inesperado: $e")),
       );
     } finally {
       setState(() => isLoading = false);
@@ -112,10 +116,7 @@ class _LoginState extends State<Login> {
               const SizedBox(height: 8),
               const Text(
                 'Poupe Dinheiro, poupe seu tempo!',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey,
-                ),
+                style: TextStyle(fontSize: 14, color: Colors.grey),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 40),
