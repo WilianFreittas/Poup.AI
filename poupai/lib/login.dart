@@ -16,7 +16,7 @@ class _LoginState extends State<Login> {
   bool isLoading = false;
 
   // Endereço base da API
-  final String baseUrl = "http://127.0.0.1:8000";//'http://10.0.2.2:8000'; // ajuste conforme ambiente
+  final String baseUrl = "http://10.0.2.2:8000";//'http://10.0.2.2:8000'; // ajuste conforme ambiente
 
   Future<void> loginUsuario() async {
     final email = emailController.text.trim();
