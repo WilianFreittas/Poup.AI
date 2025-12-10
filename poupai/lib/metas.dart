@@ -125,9 +125,8 @@
       final dados = {
         'met_titulo': titulo[0].toUpperCase() + titulo.substring(1),
         'met_valor': valorMeta,
-        'met_depositado':
-        index != null ? metas[index]['met_depositado'] : 0.0,
-        'usuario_id': widget.usuarioId,
+        'met_depositado': index != null ? metas[index]['met_depositado'] : 0.0,
+        'met_cor': index != null ? metas[index]['cor'] : "#777777",
       };
 
       try {
@@ -244,41 +243,54 @@
               child: const Text('Cancelar'),
               onPressed: () => Navigator.pop(context),
             ),
-      ElevatedButton(
-      child: const Text('Confirmar'),
-        onPressed: () async {
-          final valor = _getDoubleFromFormatted(controller.text);
-          if (valor <= 0) return;
 
-          final metaId = metas[index]['id'];
+            ElevatedButton(
+              child: const Text('Confirmar'),
+              onPressed: () async {
+                final valor = _getDoubleFromFormatted(controller.text);
+                if (valor <= 0) return;
 
-          try {
-            if (adicionar) {
-              await _api.aportarMeta(
-                widget.token,
-                metaId,
-                {'valor': valor},
-              );
-            } else {
-              await _api.retirarMeta(
-                widget.token,
-                metaId,
-                {'valor': valor},
-              );
-            }
+                final meta = metas[index];
+                final double atual = meta['met_depositado'] ?? 0.0;
+                final double total = meta['met_valor'] ?? 0.0;
 
-            await _carregarMetas();
-            await _carregarEventos(index);
+                // 🚫 REGRA: NÃO PERMITIR ULTRAPASSAR A META
+                if (adicionar && (atual + valor) > total) {
+                  final falta = total - atual;
 
-          } catch (e) {
-            debugPrint("Erro ao movimentar meta: $e");
-          }
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'O valor ultrapassa o total da meta.\n'
+                            'Falta apenas R\$ ${falta.toStringAsFixed(2)} para completar.',
+                      ),
+                      backgroundColor: Colors.red,
+                      duration: const Duration(seconds: 3),
+                    ),
+                  );
+                  return;
+                }
 
-          if (context.mounted) Navigator.pop(context);
-        },
-      ),
+                final metaId = meta['id'];
 
-      ],
+                try {
+                  if (adicionar) {
+                    await _api.aportarMeta(widget.token, metaId, {'valor': valor});
+                  } else {
+                    await _api.retirarMeta(widget.token, metaId, {'valor': valor});
+                  }
+
+                  await _carregarMetas();
+                  await _carregarEventos(index);
+
+                } catch (e) {
+                  debugPrint("Erro ao movimentar meta: $e");
+                }
+
+                if (context.mounted) Navigator.pop(context);
+              },
+            ),
+          ],
         ),
       );
     }
@@ -295,7 +307,7 @@
           .fold<double>(0, (a, b) => a > b ? a : b);
 
       return SizedBox(
-        height: 260,
+        height: 280,
         child: SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: Row(
@@ -303,51 +315,81 @@
               final meta = metas[index];
               final valor = (meta['met_valor'] ?? 0).toDouble();
               final depositado = (meta['met_depositado'] ?? 0).toDouble();
-              final progresso =
-              valor > 0 ? (depositado / valor).clamp(0.0, 1.0) : 0.0;
+              final progresso = valor > 0 ? (depositado / valor).clamp(0.0, 1.0) : 0.0;
 
-              return SizedBox(
-                width: 120,
+              return Container(
+                width: 140,
+                margin: const EdgeInsets.symmetric(horizontal: 10),
                 child: Column(
                   children: [
+                    /// GRÁFICO
                     Expanded(
                       child: BarChart(
                         BarChartData(
-                          maxY: maxMeta * 1.2,
+                          maxY: maxMeta * 1.25,
+                          groupsSpace: 20,
+
+                          /// ---- BARRAS ----
                           barGroups: [
                             BarChartGroupData(
                               x: index,
+                              barsSpace: 12,
                               barRods: [
+                                /// Fundo (valor total)
                                 BarChartRodData(
                                   toY: valor,
-                                  color: Colors.grey[300],
-                                  width: 26,
-                                  borderRadius: BorderRadius.circular(4),
+                                  width: 20,
+                                  color: Colors.grey.shade300,
+                                  borderRadius: BorderRadius.circular(6),
                                 ),
+
+                                /// Depositado
                                 BarChartRodData(
                                   toY: depositado,
+                                  width: 20,
                                   color: _corProgresso(progresso),
-                                  width: 26,
-                                  borderRadius: BorderRadius.circular(4),
+                                  borderRadius: BorderRadius.circular(6),
                                 ),
                               ],
                             ),
                           ],
+
+                          /// ---- SEM BORDAS / EIXOS ----
+                          borderData: FlBorderData(show: false),
+                          gridData: FlGridData(show: false),
                           titlesData: const FlTitlesData(
                             leftTitles: AxisTitles(),
                             rightTitles: AxisTitles(),
                             topTitles: AxisTitles(),
+                            bottomTitles: AxisTitles(),
                           ),
-                          borderData: FlBorderData(show: false),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 6),
+
+                    const SizedBox(height: 12),
+
+                    /// TÍTULO DA META
                     Text(
                       meta['met_titulo'],
                       textAlign: TextAlign.center,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 11),
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+
+                    const SizedBox(height: 4),
+
+                    /// PERCENTUAL
+                    Text(
+                      "${(progresso * 100).toStringAsFixed(0)}%",
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: _corProgresso(progresso),
+                        fontWeight: FontWeight.bold,
+                      ),
                     )
                   ],
                 ),
@@ -535,6 +577,35 @@
         ),
       );
     }
+    Widget _buildBlocoGrafico() {
+      return Card(
+        elevation: 3,
+        color: Colors.white,
+        shadowColor: Colors.black12,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 30),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const Text(
+                "Progresso das Metas",
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              _construirGraficoComparativoMetas(),
+            ],
+          ),
+        ),
+      );
+    }
 
     // ===============================
     // BUILD
@@ -564,7 +635,7 @@
               : ListView(
             padding: const EdgeInsets.only(bottom: 100),
             children: [
-              _construirGraficoComparativoMetas(),
+              _buildBlocoGrafico(),
               const SizedBox(height: 20),
               ...List.generate(metas.length, _buildMetaCard),
             ],

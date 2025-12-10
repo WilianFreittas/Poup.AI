@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart';
+import 'theme_controller.dart';
+import 'language_controller.dart';
 
 class ConfiguracoesAppPage extends StatefulWidget {
   const ConfiguracoesAppPage({super.key});
@@ -46,14 +49,18 @@ class _ConfiguracoesAppPageState extends State<ConfiguracoesAppPage> {
   // ======================================================
   // 🌓 Alterna o modo escuro/claro (somente salva)
   // ======================================================
-  void _alternarTema(bool value) async {
+  void _alternarTema(bool value) {
+    final controller = Provider.of<ThemeController>(context, listen: false);
+    controller.toggleTheme(value);
+
     setState(() => modoEscuro = value);
-    await _salvarPreferencia('modoEscuro', value);
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(
-          value ? "🌙 Modo escuro ativado." : "☀️ Modo claro ativado."
-      )),
+      SnackBar(
+        content: Text(value
+            ? "🌙 Modo escuro ativado."
+            : "☀️ Modo claro ativado."),
+      ),
     );
   }
 
@@ -83,8 +90,11 @@ class _ConfiguracoesAppPageState extends State<ConfiguracoesAppPage> {
     );
 
     if (novoIdioma != null) {
+      final langController = Provider.of<LanguageController>(context, listen: false);
+
+      await langController.changeLanguage(novoIdioma);
+
       setState(() => idioma = novoIdioma);
-      await _salvarPreferencia('idioma', novoIdioma);
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Idioma alterado para $novoIdioma.")),

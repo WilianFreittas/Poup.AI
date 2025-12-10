@@ -13,8 +13,8 @@ class ApiService {
   final Dio _dio = Dio(
     BaseOptions(
       baseUrl: "http://10.0.2.2:8000",
-      connectTimeout: Duration(seconds: 15),
-      receiveTimeout: Duration(seconds: 30),
+      connectTimeout: Duration(seconds: 30),
+      receiveTimeout: Duration(seconds: 45),
       headers: {"Content-Type": "application/json"},
     ),
   );
@@ -87,7 +87,6 @@ class ApiService {
   // ======================================================
   // 🧾 CATEGORIAS
   // ======================================================
-
   Future<List<dynamic>> getCategorias(String token) async {
     try {
       final response = await _dio.get(
@@ -100,10 +99,10 @@ class ApiService {
       rethrow;
     }
   }
-
-  Future<void> criarCategoria(String token, Map<String, dynamic> categoria) async {
+  Future<Map<String, dynamic>> criarCategoria(
+      String token, Map<String, dynamic> categoria) async {
     try {
-      await _dio.post(
+      final response = await _dio.post(
         "/v1/categorias",
         data: {
           "cat_nome": categoria["cat_nome"],
@@ -113,16 +112,17 @@ class ApiService {
         },
         options: Options(headers: {"Authorization": "Bearer $token"}),
       );
+
+      return Map<String, dynamic>.from(response.data);
     } on DioException catch (e) {
       print("❌ Criar categoria: ${e.response?.data}");
       rethrow;
     }
   }
-
-  Future<void> atualizarCategoria(
+  Future<Map<String, dynamic>> atualizarCategoria(
       String token, int catId, Map<String, dynamic> categoria) async {
     try {
-      await _dio.put(
+      final response = await _dio.put(
         "/v1/categorias/$catId",
         data: {
           "cat_nome": categoria["cat_nome"],
@@ -132,12 +132,13 @@ class ApiService {
         },
         options: Options(headers: {"Authorization": "Bearer $token"}),
       );
+
+      return Map<String, dynamic>.from(response.data);
     } on DioException catch (e) {
       print("❌ Atualizar categoria: ${e.response?.data}");
       rethrow;
     }
   }
-
   Future<void> excluirCategoria(String token, int id) async {
     try {
       await _dio.delete(

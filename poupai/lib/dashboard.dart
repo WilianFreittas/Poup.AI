@@ -77,7 +77,7 @@ class _DashboardPageState extends State<DashboardPage>
 
   final List<int> anos = List.generate(3, (i) => 2023 + i);
 
-  String mesSelecionado = 'Junho';
+  String mesSelecionado = 'Dezembro';
   int anoSelecionado = DateTime.now().year;
 
   String get periodoAtual => '$mesSelecionado-$anoSelecionado';
@@ -282,33 +282,6 @@ class _DashboardPageState extends State<DashboardPage>
         });
       }
 
-      // ✅ Garante que TODAS as categorias apareçam
-      for (final cat in categoriasUsuario) {
-        final nome = (cat['cat_nome'] ?? 'Sem Categoria').toString();
-        final tipoRaw = (cat['cat_tipo'] ?? '').toString().toLowerCase();
-
-        final tipo =
-        (tipoRaw == 'entrada' || tipoRaw == 'receita') ? 'Entrada' : 'Gasto';
-
-        final chave = '${nome.toLowerCase()}_$tipo';
-
-        if (!agrupado.containsKey(chave)) {
-          final corStr = (cat['cat_cor'] ?? '#9E9E9E').toString();
-          final cor = _parseCor(corStr);
-          final iconeStr = (cat['cat_icone'] ?? 'Outros').toString();
-
-          agrupado[chave] = {
-            'cat_id': cat['cat_id'],
-            'categoria': nome,
-            'valor': 0.0,
-            'tipo': tipo,
-            'cor': cor,
-            'icone': getIconFromName(iconeStr),
-            'transacoes': <Map<String, dynamic>>[],
-          };
-        }
-      }
-
       final lista = agrupado.values.toList()
         ..sort((a, b) => (a['categoria'] as String)
             .toLowerCase()
@@ -341,7 +314,19 @@ class _DashboardPageState extends State<DashboardPage>
     }
     return null;
   }
+  Widget _itemCategoriaSemExcluir(Map<String, dynamic> cat) {
+    final icone = getIconFromName((cat['cat_icone'] ?? 'Outros').toString());
+    final cor = _parseCor((cat['cat_cor'] ?? '#9E9E9E').toString());
+    final nome = (cat['cat_nome'] ?? '').toString();
 
+    return Row(
+      children: [
+        Icon(icone, size: 20, color: cor),
+        const SizedBox(width: 8),
+        Text(nome),
+      ],
+    );
+  }
   // ===========================
   // NOVA / EDITAR TRANSAÇÃO
   // ===========================
@@ -361,6 +346,14 @@ class _DashboardPageState extends State<DashboardPage>
     final observacaoController = TextEditingController(
       text: transacaoInicial?['tra_observacao']?.toString() ?? '',
     );
+    bool isEdicao = transacaoInicial != null;
+
+    String operacao = "Adicionar";
+    final operacaoValorController = TextEditingController();
+
+    final valorAtual = transacaoInicial != null
+        ? (transacaoInicial['valor'] as double)
+        : 0.0;
 
     DateTime dataSelecionada = transacaoInicial != null
         ? (DateTime.tryParse(transacaoInicial['data'].toString()) ??
@@ -459,22 +452,29 @@ class _DashboardPageState extends State<DashboardPage>
                           border: OutlineInputBorder(),
                         ),
                         hint: const Text("Selecione uma categoria"),
+                        selectedItemBuilder: (context) {
+                          return categoriasFiltradas.map((cat) {
+                            return _itemCategoriaSemExcluir(cat);
+                          }).toList();
+                        },
                         items: [
-                          ...categoriasFiltradas.map((cat) {
-                            final icone = getIconFromName(
-                              (cat['cat_icone'] ?? 'Outros').toString(),
-                            );
-                            final cor = _parseCor(
-                              (cat['cat_cor'] ?? '#9E9E9E').toString(),
-                            );
+                          ... categoriasFiltradas.map((cat) {
                             return DropdownMenuItem<int>(
-                              value: cat['cat_id'] as int,
-                              child: Row(
-                                children: [
-                                  Icon(icone, size: 20, color: cor),
-                                  const SizedBox(width: 8),
-                                  Text((cat['cat_nome'] ?? '').toString()),
-                                ],
+                              value: cat['cat_id'],
+                              child: _itemCategoriaComExcluir(
+                                cat,
+                                    () {
+                                  Navigator.pop(context); // 🔥 FECHA O DROPDOWN ANTES DE EXCLUIR
+
+                                  _confirmarExcluirCategoria(
+                                    cat['cat_id'],
+                                    refreshDialog: () {
+                                      setStateDialog(() {
+                                        categoriaSelecionadaId = null; // evita value inválido
+                                      });
+                                    },
+                                  );
+                                },
                               ),
                             );
                           }),
@@ -509,7 +509,6 @@ class _DashboardPageState extends State<DashboardPage>
                     else
                       TextButton.icon(
                         onPressed: () async {
-                          Navigator.pop(context);
                           final novoId = await _abrirWizardCategoria();
                           if (novoId != null) {
                             await carregarCategoriasDoBanco();
@@ -523,15 +522,88 @@ class _DashboardPageState extends State<DashboardPage>
                     const SizedBox(height: 16),
 
                     // Valor
-                    TextField(
-                      controller: valorController,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [CurrencyTextInputFormatter()],
-                      decoration: const InputDecoration(
-                        labelText: 'Valor (R\$)',
-                        border: OutlineInputBorder(),
+                    // ===============================
+// VALOR — MODO DE EDIÇÃO
+// ===============================
+                    if (isEdicao) ...[
+                      // Valor atual fixo
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          "Valor atual",
+                          style: TextStyle(fontWeight: FontWeight.w600),
+                        ),
                       ),
-                    ),
+                      const SizedBox(height: 6),
+                      TextField(
+                        readOnly: true,
+                        controller: TextEditingController(
+                          text: NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$')
+                              .format(valorAtual),
+                        ),
+                        decoration: const InputDecoration(
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // Escolher operação
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          "Operação",
+                          style: TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: ["Adicionar", "Retirar"].map((op) {
+                          final selected = operacao == op;
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            child: ChoiceChip(
+                              label: Text(op),
+                              selected: selected,
+                              selectedColor: const Color(0xFF006155),
+                              labelStyle:
+                              TextStyle(color: selected ? Colors.white : Colors.black87),
+                              onSelected: (_) {
+                                setStateDialog(() => operacao = op);
+                              },
+                            ),
+                          );
+                        }).toList(),
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // Valor da operação
+                      TextField(
+                        controller: operacaoValorController,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [CurrencyTextInputFormatter()],
+                        decoration: const InputDecoration(
+                          labelText: "Valor da operação",
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                    ] else ...[
+                      // ===============================
+                      // NOVA TRANSAÇÃO — campo normal
+                      // ===============================
+                      TextField(
+                        controller: valorController,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [CurrencyTextInputFormatter()],
+                        decoration: const InputDecoration(
+                          labelText: 'Valor (R\$)',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                    ],
 
                     const SizedBox(height: 16),
 
@@ -589,60 +661,85 @@ class _DashboardPageState extends State<DashboardPage>
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF006155),
                   ),
-                  onPressed: () async {
-                    final valorRaw =
-                    valorController.text.replaceAll(RegExp(r'[^\d]'), '');
-                    final valor = (double.tryParse(valorRaw) ?? 0) / 100;
+            onPressed: () async {
+            double valorFinal;
 
-                    if (categoriaSelecionadaId == null) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                            content: Text("Selecione uma categoria.")),
-                      );
-                      return;
-                    }
-                    if (valor <= 0) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            "Informe um valor maior que zero para a transação.",
-                          ),
-                        ),
-                      );
-                      return;
-                    }
+            if (isEdicao) {
+            final raw = operacaoValorController.text.replaceAll(RegExp(r'[^\d]'), '');
+            final operacaoValor = (double.tryParse(raw) ?? 0) / 100;
 
-                    final payload = {
-                      "tra_tipo": tipoSelecionado == 'Entrada'
-                          ? 'receita'
-                          : 'despesa',
-                      "tra_valor": valor,
-                      "tra_data":
-                      DateFormat('yyyy-MM-dd').format(dataSelecionada),
-                      "fk_categorias_cat_id": categoriaSelecionadaId,
-                      "tra_observacao": observacaoController.text.trim(),
-                    };
+            // Se o usuário não mexeu no valor → mantém o valor atual
+            if (operacaoValor == 0) {
+            valorFinal = valorAtual;
+            } else {
+            valorFinal = operacao == "Adicionar"
+            ? valorAtual + operacaoValor
+                : valorAtual - operacaoValor;
+            }
 
-                    try {
-                      if (transacaoInicial == null) {
-                        await api.criarTransacao(widget.token, payload);
-                      } else {
-                        await api.atualizarTransacao(
-                          widget.token,
-                          transacaoInicial['tra_id'],
-                          payload,
-                        );
-                      }
+            // ❌ Proíbe valor final 0 ou negativo
+            if (valorFinal <= 0) {
+            ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+            content: Text("O valor final deve ser maior que zero."),
+            ),
+            );
+            return;
+            }
+            }
+            else {
+            // NOVA TRANSAÇÃO
+            final raw = valorController.text.replaceAll(RegExp(r'[^\d]'), '');
+            valorFinal = (double.tryParse(raw) ?? 0) / 100;
 
-                      await carregarCategoriasDoBanco();
-                      if (context.mounted) Navigator.pop(context);
-                    } catch (e) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text("Erro ao salvar: $e")),
-                      );
-                    }
-                  },
-                  child: const Text("Salvar"),
+            if (valorFinal <= 0) {
+            ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+            content: Text("Informe um valor maior que zero."),
+            ),
+            );
+            return;
+            }
+            }
+
+            if (categoriaSelecionadaId == null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+            content: Text("Selecione uma categoria."),
+            ),
+            );
+            return;
+            }
+
+            final payload = {
+            "tra_tipo": tipoSelecionado == 'Entrada' ? 'receita' : 'despesa',
+            "tra_valor": valorFinal,
+            "tra_data": DateFormat('yyyy-MM-dd').format(dataSelecionada),
+            "fk_categorias_cat_id": categoriaSelecionadaId,
+            "tra_observacao": observacaoController.text.trim(),
+            };
+
+            try {
+            if (isEdicao) {
+            await api.atualizarTransacao(
+            widget.token,
+            transacaoInicial['tra_id'],
+            payload,
+            );
+            } else {
+            await api.criarTransacao(widget.token, payload);
+            }
+
+            await carregarCategoriasDoBanco();
+            if (context.mounted) Navigator.pop(context);
+            } catch (e) {
+            ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Erro ao salvar: $e")),
+            );
+            }
+            },
+
+            child: const Text("Salvar"),
                 ),
               ],
             );
@@ -665,6 +762,82 @@ class _DashboardPageState extends State<DashboardPage>
     _abrirNovaTransacao(transacaoInicial: transacao);
   }
 
+  Widget _itemCategoriaComExcluir(
+      Map<String, dynamic> cat,
+      void Function() onExcluir,
+      ) {
+    final icone = getIconFromName((cat['cat_icone'] ?? 'Outros').toString());
+    final cor = _parseCor((cat['cat_cor'] ?? '#9E9E9E').toString());
+    final nome = (cat['cat_nome'] ?? '').toString();
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Row(
+          children: [
+            Icon(icone, size: 20, color: cor),
+            const SizedBox(width: 8),
+            Text(nome),
+          ],
+        ),
+        IconButton(
+          icon: const Icon(Icons.delete, color: Colors.red),
+          onPressed: onExcluir,
+        )
+      ],
+    );
+  }
+  void _confirmarExcluirCategoria(
+      int catId, {
+        void Function()? refreshDialog,
+      }) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: const Text('Excluir categoria'),
+        content: const Text('Tem certeza que deseja excluir esta categoria?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () async {
+              Navigator.pop(context);
+
+              try {
+                await api.excluirCategoria(widget.token, catId);
+                await carregarCategoriasDoBanco();
+
+                // 🔥 Atualiza o modal, se estiver aberto
+                if (refreshDialog != null) {
+                  refreshDialog();
+                }
+
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Categoria excluída com sucesso!'),
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Erro ao excluir categoria: $e')),
+                  );
+                }
+              }
+            },
+            child: const Text('Excluir'),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ==============================
   // 🧩 Wizard de Nova / Editar Categoria
   // ==============================
@@ -684,7 +857,7 @@ class _DashboardPageState extends State<DashboardPage>
     final corStr = (categoriaInicial?['cat_cor'] ?? '#006155').toString();
     corSelecionada = _parseCor(corStr);
 
-    showDialog(
+    return showDialog<int?>(
       context: context,
       builder: (context) {
         return StatefulBuilder(
@@ -908,55 +1081,36 @@ class _DashboardPageState extends State<DashboardPage>
                     final nome = nomeController.text.trim().capitalize();
                     if (nome.isEmpty) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Preencha o nome da categoria.'),
-                        ),
+                        const SnackBar(content: Text('Preencha o nome da categoria.')),
                       );
                       return;
                     }
 
-                    final tipoCategoria =
-                        tipoSelecionado; // 'Gasto' ou 'Entrada'
+                    final tipoCategoria = tipoSelecionado;
 
                     final payload = {
                       'cat_nome': nome,
-                      'cat_tipo':
-                      tipoCategoria == "Entrada" ? "Entrada" : "Gasto",
+                      'cat_tipo': tipoCategoria == "Entrada" ? "Entrada" : "Gasto",
                       'cat_cor': colorToHex(corSelecionada),
                       'cat_icone': iconeSelecionado,
                     };
 
                     try {
+                      int novoId;
+
                       if (categoriaInicial == null) {
                         final nova = await api.criarCategoria(widget.token, payload);
-                        Navigator.pop(context);
+                        novoId = nova['cat_id'];
+                        Navigator.pop(context, novoId);   // RETORNA O ID
                       } else {
                         final id = categoriaInicial!['cat_id'];
                         await api.atualizarCategoria(widget.token, id, payload);
-                        Navigator.pop(context, id);
-                      }
-
-                      await carregarCategoriasDoBanco();
-                      if (context.mounted) {
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              categoriaInicial == null
-                                  ? 'Categoria criada com sucesso!'
-                                  : 'Categoria atualizada com sucesso!',
-                            ),
-                          ),
-                        );
+                        Navigator.pop(context, id);       // RETORNA O ID
                       }
                     } catch (e) {
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              'Erro ao salvar categoria. Detalhes: $e',
-                            ),
-                          ),
+                          SnackBar(content: Text('Erro ao salvar categoria: $e')),
                         );
                       }
                     }
@@ -1222,7 +1376,8 @@ class _DashboardPageState extends State<DashboardPage>
   Widget _construirGraficoDeBarras() {
     final categorias = dadosPorPeriodo[periodoAtual] ?? [];
     final categoriasFiltradas = categorias
-        .where((c) => (c['valor'] as double) > 0)
+        .where((c) =>
+    c['tipo'] == 'Gasto' && (c['valor'] as double) > 0)
         .toList();
 
     if (categoriasFiltradas.isEmpty) {
@@ -1306,11 +1461,33 @@ class _DashboardPageState extends State<DashboardPage>
                 leftTitles: AxisTitles(
                   sideTitles: SideTitles(
                     showTitles: true,
-                    reservedSize: 48,
-                    getTitlesWidget: (value, meta) => Text(
-                      _fmt.format(value),
-                      style: const TextStyle(fontSize: 10),
-                    ),
+                    reservedSize: 50, // um pouco maior para caber os textos
+                    getTitlesWidget: (value, meta) {
+                      String texto;
+
+                      if (value < 1000) {
+                        // até 999 → mostra com 2 casas decimais
+                        texto = NumberFormat.currency(
+                          locale: 'pt_BR',
+                          symbol: '',
+                          decimalDigits: 2,
+                        ).format(value);
+                      } else {
+                        // acima de 1000 → mostra como "1k", "1.5k", etc.
+                        texto = NumberFormat.compactCurrency(
+                          decimalDigits: 1,
+                          symbol: '',
+                        ).format(value).toLowerCase();
+                      }
+
+                      return Text(
+                        texto,
+                        maxLines: 1,
+                        softWrap: false,
+                        overflow: TextOverflow.fade,
+                        style: const TextStyle(fontSize: 10),
+                      );
+                    },
                   ),
                 ),
                 topTitles: const AxisTitles(
@@ -1493,12 +1670,19 @@ class _DashboardPageState extends State<DashboardPage>
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  _fmt.format(valor),
-                  style: TextStyle(
-                    color: color,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    _fmt.format(valor),
+                    maxLines: 1,
+                    softWrap: false,
+                    overflow: TextOverflow.fade,
+                    style: TextStyle(
+                      color: color,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ],
@@ -1562,8 +1746,9 @@ class _DashboardPageState extends State<DashboardPage>
       ),
       floatingActionButton: FloatingActionButton.extended(
         heroTag: 'addTransacao',
-        onPressed: () {
-          _abrirNovaTransacao();
+        onPressed: () async {
+          await carregarCategoriasDoBanco(); // ← garante lista nova
+          if (mounted) _abrirNovaTransacao();
         },
         backgroundColor: const Color(0xFF006155),
         icon: const Icon(Icons.add),
@@ -1572,6 +1757,7 @@ class _DashboardPageState extends State<DashboardPage>
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: ListView(
+          padding: const EdgeInsets.only(bottom: 120),
           children: [
             // Seletor de período
             Container(
@@ -1674,8 +1860,36 @@ class _DashboardPageState extends State<DashboardPage>
             if (modoSelecionado == 'Dashboard')
               _construirDashboard()
             else
-              _construirGraficoDeBarras(),
-            const SizedBox(height: 100),
+              Column(
+                children: [
+                  _construirGraficoDeBarras(),
+                  const SizedBox(height: 30),
+
+                  /// 🔴 LISTA DE GASTOS
+                  _buildSectionTitle('Gastos', Icons.arrow_downward, Colors.redAccent),
+                  CategoriaListWidget(
+                    categorias: (dadosPorPeriodo[periodoAtual] ?? [])
+                        .where((c) => c['tipo'] == 'Gasto')
+                        .toList(),
+                    onExcluir: _confirmarExcluirTransacao,
+                    onEditar: (id) => _abrirEditarTransacao(id as int),
+                    fmt: _fmt,
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  /// 🟢 LISTA DE ENTRADAS
+                  _buildSectionTitle('Entradas', Icons.arrow_upward, Colors.green),
+                  CategoriaListWidget(
+                    categorias: (dadosPorPeriodo[periodoAtual] ?? [])
+                        .where((c) => c['tipo'] == 'Entrada')
+                        .toList(),
+                    onExcluir: _confirmarExcluirTransacao,
+                    onEditar: (id) => _abrirEditarTransacao(id as int),
+                    fmt: _fmt,
+                  ),
+                ],
+              ),
           ],
         ),
       ),
